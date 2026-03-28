@@ -337,4 +337,324 @@ body {
 }
 
 .Agent-Name { color: var(--accent-color); margin-right: 8px; }
-.Empty-State { color: var(--text-secondary); text-align: center; padding-top: 2rem; }
+.Empty-State { color: var(--text-secondary); text-align: center; padding-top: 2rem; font-size: 0.9rem; }
+.LoadingState, .ErrorState { 
+  color: var(--text-secondary); 
+  text-align: center; 
+  padding: 2rem;
+  font-size: 0.9rem;
+}
+.ErrorState { color: var(--danger); }
+
+/* History View Specific Styles */
+.HistoryView-Container {
+  flex: 1;
+  padding: 1.5rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+}
+
+.HistoryView-Container .View-Title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1rem;
+}
+
+.History-Timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.Timeline-Section {
+  border-left: 3px solid var(--border-color);
+  padding-left: 1.5rem;
+}
+
+.Timeline-Section h3 {
+  font-size: 1.1rem;
+  color: var(--accent-color);
+  margin-top: 0;
+  margin-bottom: 1rem;
+  position: relative;
+}
+
+.Timeline-Section h3::before {
+  content: '';
+  position: absolute;
+  left: -2.3rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  background: var(--accent-color);
+  border-radius: 50%;
+  border: 2px solid var(--primary-bg);
+}
+
+.History-Entry {
+  background: rgba(255,255,255,0.03);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.History-Entry:hover {
+  border-color: var(--accent-color);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+.telemetry-entry .Entry-Icon {
+  color: var(--success);
+  background: rgba(63, 185, 80, 0.1);
+}
+
+.simulation-entry .Entry-Icon {
+  color: var(--warning);
+  background: rgba(241, 224, 90, 0.1);
+}
+
+.Entry-Icon {
+  padding: 8px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.Entry-Content {
+  flex: 1;
+}
+
+.Entry-Timestamp {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  display: block;
+  margin-bottom: 0.4rem;
+}
+
+.History-Entry p {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.Entry-Source {
+  font-style: italic;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.Simulation-Report-Summary {
+  background: #0d1117;
+  border-radius: 6px;
+  padding: 0.8rem;
+  margin-top: 0.8rem;
+}
+
+.Report-Item {
+  font-size: 0.85rem !important;
+  color: var(--text-secondary) !important;
+  margin-bottom: 0.3rem !important;
+  line-height: 1.4;
+}
+
+.Agent-Badge {
+  display: inline-block;
+  background: var(--accent-color);
+  color: var(--primary-bg);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  margin-right: 8px;
+  font-size: 0.75rem;
+}
+
+/* Scenario View Specific Styles */
+.ScenarioView-Container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.Scenario-Creation-Panel, .Scenario-List-Panel {
+  padding: 1.5rem;
+}
+
+.Input-Group {
+  margin-bottom: 1.2rem;
+}
+
+.Input-Group label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.Input-Group input, .Input-Group textarea {
+  width: 100%;
+  background: var(--sidebar-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+.Scenario-List {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.Scenario-Card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.Scenario-Card h4 {
+  margin: 0;
+  color: var(--accent-color);
+}
+
+.Scenario-Description {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.Scenario-Params {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+
+.Scenario-Params li {
+  margin-bottom: 4px;
+}
+
+.Scenario-Actions {
+  margin-top: auto;
+  display: flex;
+  gap: 10px;
+}
+
+/* Settings View Specific Styles */
+.SettingsView-Container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.Settings-Grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.Settings-Card {
+  padding: 1.5rem;
+}
+
+.Settings-Card h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--accent-color);
+  margin-bottom: 1.2rem;
+  font-size: 1.1rem;
+}
+
+.Setting-Item {
+  margin-bottom: 1.2rem;
+}
+
+.Setting-Item label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.4rem;
+}
+
+.Setting-Item input, .Setting-Item select {
+  width: 100%;
+  background: var(--sidebar-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.Setting-Help {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.Toggle-Group {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.System-Status {
+  padding: 1.5rem;
+}
+
+.Heartbeat-Grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.Heartbeat-Item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255,255,255,0.02);
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.Status-Indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.Status-Indicator.online {
+  background: var(--success);
+  box-shadow: 0 0 8px var(--success);
+}
+
+.Service-Name {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
