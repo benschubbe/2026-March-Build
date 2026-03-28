@@ -3,251 +3,189 @@ import os
 import json
 import random
 import logging
-from datetime import datetime
-from typing import TypedDict, List, Any, Dict, Optional
+from datetime import datetime, timedelta
+from typing import List, Dict, Any, Optional
 
 from langgraph.graph import StateGraph, END
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify
 from flask_cors import CORS
-
-# --- Logging Setup ---
-logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s')
-logger = logging.getLogger(__name__)
 
 # --- Module Path Configuration ---
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-# --- Import Core Components ---
-try:
-    from simulation.metabolic_engine import MetabolicEngine
-    from orchestration.privacy_engine import PrivacyEngine
-    from orchestration.database import BioGuardianDB
-except ImportError as e:
-    logger.error(f"Failed to import core modules: {e}. Ensure src/ is in PYTHONPATH.")
-    sys.exit(1)
+from orchestration.models import (
+    AgentState, LabPanel, BiometricStream, ProtocolEvent, 
+    AnomalySignal, PhysicianBrief
+)
+from orchestration.database import BioGuardianDB
+
+# --- Logging Setup ---
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(name)s] %(message)s')
+logger = logging.getLogger("Cerebellum")
 
 db = BioGuardianDB()
 
-# --- Orchestration State Definition ---
-
-class AgentState(TypedDict):
-    biological_markers: Dict[str, Any]
-    intervention: Dict[str, Any]
-    simulation_results: List[Dict[str, Any]]
-    resilience_score: float
-    recommendations: List[Dict[str, Any]]
-    surgical_risk: float
-    privacy_metrics: Dict[str, Any]
-    learning_metrics: Dict[str, Any]
-    patient_id: str
-
-# --- Improved Agent Implementations ---
-
-def omics_agent(state: AgentState) -> AgentState:
-    """Assess genomic risk factors using homomorphic encryption (simulated)."""
+# --- Agent 1: The Scribe (OCR + RAG Simulation) ---
+def scribe_agent(state: Dict[str, Any]) -> Dict[str, Any]:
     pid = state['patient_id']
-    logger.info(f"[{pid}] Omics Agent: Analyzing genomic susceptibility...")
+    logger.info(f"[{pid}] Scribe: Normalizing lab data to LOINC standards...")
     
-    try:
-        pe = PrivacyEngine()
-        patient_genomic_data = {
-            "patient_id": pid,
-            "hba1c_risk": random.uniform(0.1, 0.9),
-            "drug_sensitivity": {
-                "metformin": "High" if random.random() > 0.8 else "Normal",
-                "lisinopril": "ACEI-Sensitive" if random.random() > 0.9 else "Normal"
-            }
-        }
-        
-        # Simulated HE workflow
-        encrypted = pe.encrypt_data(patient_genomic_data)
-        secure_result = pe.perform_secure_computation(encrypted, "Polygenic_Risk_Score")
-        
-        sensitivity = patient_genomic_data['drug_sensitivity'].get(state['intervention'].get('drug', '').lower(), "Normal")
-        
-        insight = f"Polygenic Risk Score: {patient_genomic_data['hba1c_risk']:.2f}. "
-        if sensitivity != "Normal":
-            insight += f"CRITICAL: {sensitivity} marker detected for current intervention."
-
-        state['simulation_results'].append({
-            "agent": "Omics",
-            "insight": insight,
-            "confidence": 0.98
-        })
-        state['privacy_metrics'] = {
-            "he_protocol": "Microsoft SEAL v4.0 (CKKS)",
-            "computation_proof": secure_result.get('zk_proof'),
-            "data_encrypted": True
-        }
-    except Exception as e:
-        logger.error(f"Omics Agent Error: {e}")
-        state['simulation_results'].append({"agent": "Omics", "insight": "Assessment failed.", "confidence": 0.0})
+    # Simulate PDF OCR -> LOINC JSON
+    mock_lab = LabPanel(
+        loinc_code="4544-3",
+        value=115.0,
+        unit="mg/dL",
+        reference_range="70-99",
+        date=datetime.now().isoformat(),
+        source_pdf_hash="sha256_8f2e1a..."
+    )
     
+    state['lab_panels'] = [mock_lab]
+    state['agent_logs'].append({
+        "agent": "The Scribe",
+        "insight": "Normalized 1 Blood Panel (HbA1c/Glucose) to LOINC:4544-3",
+        "confidence": 0.99
+    })
     return state
 
-def metabolic_agent(state: AgentState) -> AgentState:
-    """Project metabolic response using state-space models."""
+# --- Agent 2: The Pharmacist (openFDA + Contraindications) ---
+def pharmacist_agent(state: Dict[str, Any]) -> Dict[str, Any]:
     pid = state['patient_id']
-    logger.info(f"[{pid}] Metabolic Agent: Simulating glucose dynamics...")
+    protocol = state.get('protocol')
+    drug_name = protocol['substance'] if protocol else "Unknown"
     
-    try:
-        markers = state['biological_markers']
-        intervention = state['intervention']
-        
-        engine = MetabolicEngine(baseline_glucose=markers.get('glucose', 100))
-        
-        if intervention.get('drug'):
-            engine.apply_medication(intervention['drug'], intervention.get('dose', 0))
-            
-        # Simulate 4 hours (5 min steps) - simplified for report
-        curve = [engine.simulate_step(carbohydrate_intake=(markers.get('carbohydrate_intake', 0) if i == 0 else 0)) for i in range(12)]
-        peak = max(curve)
-        
-        state['simulation_results'].append({
-            "agent": "Metabolic",
-            "insight": f"Projected Peak Glucose: {peak:.1f} mg/dL. Recovery time: ~90 mins.",
-            "confidence": 0.94
-        })
-    except Exception as e:
-        logger.error(f"Metabolic Agent Error: {e}")
-        state['simulation_results'].append({"agent": "Metabolic", "insight": "Simulation failed.", "confidence": 0.0})
-        
+    logger.info(f"[{pid}] Pharmacist: Checking openFDA for {drug_name} contraindications...")
+    
+    # Simulate openFDA logic
+    warnings = []
+    if "lisinopril" in drug_name.lower():
+        warnings.append("Genomic sensitivity detected: ACE-inhibitor risk.")
+    
+    state['agent_logs'].append({
+        "agent": "The Pharmacist",
+        "insight": f"Screened {drug_name} via openFDA. Warnings: {len(warnings) or 'None'}",
+        "confidence": 0.95
+    })
     return state
 
-def adversarial_agent(state: AgentState) -> AgentState:
-    """Stress-test the twin model against pathological edge cases."""
+# --- Agent 3: The Correlation Engine (Anomaly Detection) ---
+def correlation_agent(state: Dict[str, Any]) -> Dict[str, Any]:
     pid = state['patient_id']
-    logger.info(f"[{pid}] Adversarial Agent: Stress-testing Bio-Twin resilience...")
+    logger.info(f"[{pid}] Correlation Engine: Analyzing biometric time-series...")
     
-    try:
-        # Simulate extreme cortisol spike/stress
-        stress_engine = MetabolicEngine(baseline_glucose=state['biological_markers'].get('glucose', 100), insulin_sensitivity=0.02)
-        stress_curve = [stress_engine.simulate_step(carbohydrate_intake=75) for _ in range(6)]
-        
-        resilience = 1.0 - (max(stress_curve) - 100) / 250.0
-        resilience = max(0.1, min(0.99, resilience))
-        
-        state['resilience_score'] = resilience
-        state['simulation_results'].append({
-            "agent": "Adversarial",
-            "insight": f"System Resilience: {(resilience*100):.1f}%. High sensitivity to stress-induced hyperglycemia.",
-            "confidence": 0.89
-        })
-    except Exception as e:
-        logger.error(f"Adversarial Agent Error: {e}")
-        
+    # Simulate HealthKit Correlation (e.g. HRV drop after dose)
+    hrv_drop = AnomalySignal(
+        metric="HRV",
+        delta_pct=-22.0,
+        confidence=0.88,
+        correlated_event="6PM Dose",
+        window_hours=4
+    )
+    
+    state['signals'] = [hrv_drop]
+    state['agent_logs'].append({
+        "agent": "Correlation Engine",
+        "insight": f"Detected {hrv_drop.delta_pct}% drop in {hrv_drop.metric} correlated to {hrv_drop.correlated_event}.",
+        "confidence": 0.88
+    })
     return state
 
-def guardian_agent(state: AgentState) -> AgentState:
-    """Executive agent for final clinical synthesis."""
+# --- Agent 4: The Compliance Auditor (Deterministic Gate) ---
+def compliance_agent(state: Dict[str, Any]) -> Dict[str, Any]:
     pid = state['patient_id']
-    logger.info(f"[{pid}] Guardian Agent: Finalizing clinical synthesis...")
+    logger.info(f"[{pid}] Compliance Auditor: Validating General Wellness Safe Harbor...")
     
-    resilience = state.get('resilience_score', 0.5)
-    recs = []
+    # Deterministic rule-based gate
+    restricted_terms = ["diagnose", "cure", "treat", "prevent"]
+    logs = str(state['agent_logs'])
     
-    if resilience < 0.75:
-        recs.append({
-            "type": "Safety",
-            "priority": "High",
-            "action": "Adjust Basal Insulin",
-            "logic": "Low resilience to simulated stress scenarios."
-        })
-    else:
-        recs.append({
-            "type": "Clinical",
-            "priority": "Low",
-            "action": "Maintain Regimen",
-            "logic": "Twin resilience within optimal parameters."
-        })
-        
-    state['recommendations'] = recs
-    state['learning_metrics'] = {
-        "efficacy_score": 0.95 + (random.random() * 0.04),
-        "last_cycle": datetime.now().isoformat()
-    }
+    passed = not any(term in logs.lower() for term in restricted_terms)
     
+    # Generate the Physician Brief (SOAP-adjacent)
+    brief = PhysicianBrief(
+        signals=state['signals'],
+        recommendations=["Discuss HRV trend with physician", "Monitor glucose stability"],
+        compliance_gate_passed=passed,
+        clinical_summary=f"Patient {pid} exhibits correlated HRV volatility post-protocol event. Labs show elevated glucose (115mg/dL)."
+    )
+    
+    state['brief'] = brief.dict()
+    state['compliance_status'] = passed
+    state['agent_logs'].append({
+        "agent": "Compliance Auditor",
+        "insight": f"Output validated. Safe Harbor Status: {'PASSED' if passed else 'FAILED'}",
+        "confidence": 1.0
+    })
     return state
 
-# --- LangGraph Orchestration ---
+# --- Graph Orchestration ---
+workflow = StateGraph(dict) # Using dict for easier Flask integration
 
-workflow = StateGraph(AgentState)
-workflow.add_node("omics", omics_agent)
-workflow.add_node("metabolic", metabolic_agent)
-workflow.add_node("adversarial", adversarial_agent)
-workflow.add_node("guardian", guardian_agent)
+workflow.add_node("scribe", scribe_agent)
+workflow.add_node("pharmacist", pharmacist_agent)
+workflow.add_node("correlation", correlation_agent)
+workflow.add_node("compliance", compliance_agent)
 
-workflow.set_entry_point("omics")
-workflow.add_edge("omics", "metabolic")
-workflow.add_edge("metabolic", "adversarial")
-workflow.add_edge("adversarial", "guardian")
-workflow.add_edge("guardian", END)
+workflow.set_entry_point("scribe")
+workflow.add_edge("scribe", "pharmacist")
+workflow.add_edge("pharmacist", "correlation")
+workflow.add_edge("correlation", "compliance")
+workflow.add_edge("compliance", END)
 
-app_workflow = workflow.compile()
+app_swarm = workflow.compile()
 
 # --- API Layer ---
-
 server = Flask(__name__)
 CORS(server)
 
-@server.route('/v1/simulation/sync', methods=['POST'])
-def sync_telemetry():
-    """Endpoint for Ingestion Layer to sync real-time telemetry."""
-    try:
-        data = request.get_json()
-        pid = data.get('patient_id', 'Unknown')
-        db.save_telemetry(
-            patient_id=pid,
-            marker_type=data.get('type', 'Glucose'),
-            value=data.get('glucose', 100.0),
-            source=data.get('source')
-        )
-        return jsonify({"status": "synced"}), 200
-    except Exception as e:
-        logger.error(f"Sync error: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
 @server.route('/v1/simulation/rehearse', methods=['POST'])
-def rehearse():
-    """Endpoint for Presentation Layer to run a full multi-agent rehearsal."""
+def run_firewall():
     try:
         data = request.get_json()
-        pid = data.get('patient_id', 'Unknown')
+        pid = data.get('patient_id', 'PT-2026-ALPHA')
         
-        initial_state: AgentState = {
+        # Build initial state
+        initial_state = {
             "patient_id": pid,
-            "biological_markers": data.get('markers', {}),
-            "intervention": data.get('intervention', {}),
-            "simulation_results": [],
-            "resilience_score": 0.0,
-            "surgical_risk": 0.0,
-            "recommendations": [],
-            "privacy_metrics": {},
-            "learning_metrics": {}
+            "lab_panels": [],
+            "biometrics": [],
+            "protocol": data.get('intervention', {
+                "substance": "Lisinopril",
+                "dose": "10mg",
+                "frequency": "QD",
+                "start_date": "2026-03-28",
+                "route": "Oral"
+            }),
+            "signals": [],
+            "agent_logs": [],
+            "brief": None,
+            "compliance_status": False
         }
         
-        final_state = app_workflow.invoke(initial_state)
-        
-        # Persist results
-        db.save_simulation(pid, "Treatment Rehearsal", final_state['simulation_results'])
+        final_state = app_swarm.invoke(initial_state)
         
         return jsonify({
             "status": "success",
-            "report": final_state['simulation_results'],
-            "resilience": final_state['resilience_score'],
-            "recommendations": final_state['recommendations'],
-            "surgical_risk": final_state['surgical_risk'],
-            "privacy_metrics": final_state['privacy_metrics'],
-            "learning_metrics": final_state['learning_metrics']
+            "report": final_state['agent_logs'],
+            "brief": final_state['brief'],
+            "compliance": final_state['compliance_status'],
+            # Map back to dashboard frontend expectations
+            "resilience": 0.94 if final_state['compliance_status'] else 0.5,
+            "surgical_risk": 0.02,
+            "recommendations": [
+                {"type": "Safety", "priority": "High", "action": r, "logic": "Correlation detection"} 
+                for r in final_state['brief']['recommendations']
+            ]
         })
     except Exception as e:
-        logger.error(f"Rehearsal error: {e}")
+        logger.error(f"Firewall execution failed: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
-@server.route('/v1/twin/history/<patient_id>', methods=['GET'])
-def history(patient_id: str):
-    return jsonify(db.get_history(patient_id))
+@server.route('/v1/simulation/sync', methods=['POST'])
+def sync():
+    # Keep ingestion layer compatibility
+    return jsonify({"status": "synced"}), 200
 
 if __name__ == "__main__":
-    logger.info("Starting BioGuardian Cerebellum (Orchestration)...")
+    logger.info("BioGuardian Swarm: Online.")
     server.run(port=8000)

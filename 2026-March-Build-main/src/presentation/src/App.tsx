@@ -255,9 +255,10 @@ function App() {
                     <span className="Agent-Message">{result.insight}</span>
                   </div>
                 )) : (
-                  <div className="Empty-State">No simulation data. Run rehearsal to trigger agents.</div>
+                  <div className="Empty-State">Biological Firewall Standby. Run Rehearsal to trigger Swarm analysis.</div>
                 )}
               </div>
+
             </div>
           </section>
         )}
