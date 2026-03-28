@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package telemetry;
+
+service TelemetryService {
+  rpc SendStream (stream TelemetryData) returns (TelemetryResponse) {}
+}
+
+message TelemetryData {
+  string patient_id = 1;
+  string source = 2; // e.g., "Oura", "CGM", "AppleWatch"
+  string type = 3;   // e.g., "glucose", "heart_rate", "sleep"
+  double value = 4;
+  string unit = 5;
+  int64 timestamp = 6;
+}
+
+message TelemetryResponse {
+  bool success = 1;
+  string message = 2;
+}
