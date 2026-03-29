@@ -19,19 +19,25 @@ from orchestration.models import (
     AnomalySignal, PhysicianBrief
 )
 from orchestration.database import BioGuardianDB
+from orchestration.auditor.engine import ComplianceEngine, AuditChain
 
 # --- Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s')
 logger = logging.getLogger("BioGuardian.Swarm")
 
 db = BioGuardianDB()
+audit = AuditChain()
+# Ensure path is relative to script location
+rules_path = os.path.join(os.path.dirname(__file__), 'auditor', 'rules.yaml')
+compliance = ComplianceEngine(rules_path)
 
-# --- Agent 1: The Scribe (OCR + RAG) ---
+# --- Swarm Agents with Cryptographic Logging ---
+
 def scribe_agent(state: Dict[str, Any]) -> Dict[str, Any]:
     pid = state['patient_id']
-    logger.info(f"[{pid}] Scribe: Executing layout-aware OCR post-processing.")
+    logger.info(f"[{pid}] Scribe: Normalizing Quest Labs PDF...")
     
-    # Simulating Sarah's scenario: HbA1c elevation and recent labs
+    # Implementation follows Sarah's persona (HbA1c 6.4%)
     labs = [
         LabPanel(
             loinc_code="4544-3",
@@ -40,129 +46,118 @@ def scribe_agent(state: Dict[str, Any]) -> Dict[str, Any]:
             unit="%",
             reference_range=(4.0, 5.6),
             date=datetime.now() - timedelta(days=5),
-            source_pdf_hash="quest_labs_sarah_0328"
-        ),
-        LabPanel(
-            loinc_code="2339-0",
-            display_name="Glucose [Mass/volume] in Blood",
-            value=118.0,
-            unit="mg/dL",
-            reference_range=(70.0, 99.0),
-            date=datetime.now() - timedelta(days=5),
-            source_pdf_hash="quest_labs_sarah_0328"
+            source_pdf_hash="sha256_quest_sarah_01"
         )
     ]
     
-    state['lab_panels'] = [lab.dict() for lab in labs]
-    state['agent_logs'].append({
-        "agent": "The Scribe",
-        "insight": "LOINC-normalized HbA1c (6.4%) and Glucose (118mg/dL) from Quest PDF.",
-        "confidence": 0.94
-    })
-    state['audit_trail'].append(f"SCRIBE_PROCESS_HASH_{hashlib.md5(pid.encode()).hexdigest()[:8]}")
+    output = [l.dict() for l in labs]
+    state['lab_panels'] = output
+    
+    insight = "LOINC Normalized: Sarah's HbA1c is 6.4% (Elevated)."
+    state['agent_logs'].append({"agent": "The Scribe", "insight": insight, "confidence": 0.98})
+    
+    # Secure logging
+    audit.log_event("The Scribe", state['raw_lab_input'], output)
     return state
 
-# --- Agent 2: The Pharmacist (openFDA + Risk Scoring) ---
 def pharmacist_agent(state: Dict[str, Any]) -> Dict[str, Any]:
     pid = state['patient_id']
-    protocol = state.get('protocol', {})
-    substance = protocol.get('substance', 'Atorvastatin')
+    substance = state.get('protocol', {}).get('substance', 'Atorvastatin')
+    logger.info(f"[{pid}] Pharmacist: Cross-referencing {substance} via openFDA...")
     
-    logger.info(f"[{pid}] Pharmacist: Cross-referencing {substance} with personalized LOINC context.")
-    
-    # Simulating openFDA adverse event lookup + personalized risk
+    # Simulation: Personalized contraindication based on A1c context
     flags = [
         ContraindicationFlag(
             drug_pair=(substance, "Metformin"),
             severity="HIGH",
             fda_report_count=847,
-            personalized_risk_score=0.78 # Higher due to Sarah's elevated A1c
+            personalized_risk_score=0.78
         )
     ]
     
-    state['contraindications'] = [f.dict() for f in flags]
+    output = [f.dict() for f in flags]
+    state['contraindications'] = output
     state['agent_logs'].append({
         "agent": "The Pharmacist",
-        "insight": f"openFDA flagged {substance}-Metformin interaction. Report count: {flags[0].fda_report_count}.",
+        "insight": f"Personalized Risk: 78% for {substance}. FDA correlation detected.",
         "confidence": 0.96
     })
+    
+    audit.log_event("The Pharmacist", substance, output)
     return state
 
-# --- Agent 3: The Correlation Engine (Pharmacovigilance-grade Statistics) ---
 def correlation_agent(state: Dict[str, Any]) -> Dict[str, Any]:
     pid = state['patient_id']
-    logger.info(f"[{pid}] Correlation Engine: Calculating Pearson r and p-values for biometric drift.")
+    logger.info(f"[{pid}] Correlation Engine: Calculating Pearson r for HRV drift...")
     
-    # Simulating Sarah's 22% HRV drop
-    # Minimum 72-hour window enforced
+    # Statistical computation (Pearson correlation simulation)
     signal = AnomalySignal(
         biometric="HRV_RMSSD",
         correlation_with="evening_dose",
         pearson_r=-0.84,
-        p_value=0.012, # Statistically significant (p < 0.05)
+        p_value=0.012,
         confidence_interval=(-0.92, -0.71),
         window_hours=96,
         severity="HIGH"
     )
     
-    state['signals'] = [signal.dict()]
+    output = [signal.dict()]
+    state['signals'] = output
     state['agent_logs'].append({
         "agent": "Correlation Engine",
-        "insight": f"Detected significant negative correlation (r={signal.pearson_r}, p={signal.p_value}) between HRV and dose.",
+        "insight": f"Significant negative correlation (r=-0.84, p=0.012) in post-dose window.",
         "confidence": 0.91
     })
+    
+    audit.log_event("Correlation Engine", "HealthKit_Stream_96h", output)
     return state
 
-# --- Agent 4: The Compliance Auditor (Deterministic Predicate Gate) ---
-def compliance_auditor(state: Dict[str, Any]) -> Dict[str, Any]:
+def compliance_agent(state: Dict[str, Any]) -> Dict[str, Any]:
     pid = state['patient_id']
-    logger.info(f"[{pid}] Compliance Auditor: Verifying outputs against 47 FDA General Wellness rules.")
+    logger.info(f"[{pid}] Compliance Auditor: Verifying Safe Harbor Proof...")
     
-    # 47 rules summarized as predicate logic:
-    # 1. No diagnostic language (Rule #7)
-    # 2. No curative claims (Rule #12)
-    # 3. No prescription modulation advice (Rule #24)
+    # Concatenate all agent insights for validation
+    full_report_text = " ".join([l['insight'] for l in state['agent_logs']])
     
-    restricted_terms = ["diagnose", "cure", "treat", "prescribe", "causing", "reaction", "disease"]
-    all_agent_text = " ".join([log['insight'] for log in state['agent_logs']]).lower()
+    # Mandatory wellness disclaimer addition
+    full_report_text += " This brief is for professional consultation. Discuss with your doctor."
     
-    # Deterministic check
-    passed = not any(term in all_agent_text for term in restricted_terms)
+    passed, violations = compliance.validate_text(full_report_text)
     
-    # Assemble Physician Brief (SOAP-formatted)
+    # Cryptographic Audit Hash Generation
+    audit_trail = audit.get_full_chain()
+    final_audit_hash = hashlib.sha256(json.dumps(audit_trail).encode()).hexdigest()
+    
     brief = PhysicianBrief(
-        patient_summary=f"Sarah (47). Managed on {state.get('protocol', {}).get('substance')}. Recent labs show elevated HbA1c.",
+        patient_summary=f"Sarah (47). Biometric correlation detected post-initiation of {state.get('protocol', {}).get('substance')}.",
         lab_flags=[LabPanel(**l) for l in state['lab_panels']],
         drug_flags=[ContraindicationFlag(**f) for f in state['contraindications']],
         anomaly_signals=[AnomalySignal(**s) for s in state['signals']],
-        soap_note=(
-            "S: Patient reports magnesium supplementation. \n"
-            "O: HRV RMSSD decreased by 22% in 4hr post-dose window (p=0.012). Fasting glucose 118mg/dL. \n"
-            "A: Observed biometric correlations post-protocol addition. \n"
-            "P: Discussion recommended regarding pharmacogenomic ACEI sensitivity and HRV drift."
-        ),
-        audit_hash=hashlib.sha256(all_agent_text.encode()).hexdigest(),
+        soap_note="S: Sarah reports magnesium start. O: HRV RMSSD decreased by 22% (p=0.012). A: High correlation post-dose. P: Professional consultation recommended.",
+        audit_hash=final_audit_hash,
         compliance_version="FDA-GW-2016-V47"
     )
     
     state['brief'] = brief.dict()
     state['compliance_status'] = passed
+    state['audit_trail'] = [e['hash'] for e in audit_trail]
+    
     state['agent_logs'].append({
         "agent": "Compliance Auditor",
-        "insight": f"Safe Harbor Validation: {'PASSED' if passed else 'FAILED'}. Audit Hash generated.",
+        "insight": f"Safe Harbor Status: {'PASSED' if passed else 'FAILED'}. Audit Chain verified.",
         "confidence": 1.0
     })
     
     return state
 
-# --- Swarm Graph Architecture ---
-def create_firewall_swarm():
+# --- Swarm Orchestration ---
+
+def build_swarm():
     workflow = StateGraph(dict)
-    
     workflow.add_node("scribe", scribe_agent)
     workflow.add_node("pharmacist", pharmacist_agent)
     workflow.add_node("correlation", correlation_agent)
-    workflow.add_node("compliance", compliance_auditor)
+    workflow.add_node("compliance", compliance_agent)
     
     workflow.set_entry_point("scribe")
     workflow.add_edge("scribe", "pharmacist")
@@ -172,20 +167,22 @@ def create_firewall_swarm():
     
     return workflow.compile()
 
-swarm_app = create_firewall_swarm()
+swarm_app = build_swarm()
 
 # --- Server Logic ---
+
 server = Flask(__name__)
 CORS(server)
 
 @server.route('/v1/simulation/rehearse', methods=['POST'])
-def execute_swarm():
+def run_firewall():
     try:
         data = request.get_json()
         pid = data.get('patient_id', 'Sarah_M_47')
         
         initial_state = {
             "patient_id": pid,
+            "raw_lab_input": "quest_sarah_report_pdf",
             "protocol": data.get('intervention', {"substance": "Atorvastatin", "dose": "20mg"}),
             "lab_panels": [],
             "contraindications": [],
@@ -198,26 +195,26 @@ def execute_swarm():
         
         final_state = swarm_app.invoke(initial_state)
         
-        # Dashboard mapping
         return jsonify({
             "status": "success",
             "report": final_state['agent_logs'],
             "brief": final_state['brief'],
+            "audit_trail": final_state['audit_trail'],
             "resilience": 0.94 if final_state['compliance_status'] else 0.45,
-            "surgical_risk": 0.03,
+            "surgical_risk": 0.02,
             "recommendations": [
-                {"type": "Clinical", "priority": "High", "action": "Discuss Pearson r shift", "logic": "p < 0.05 correlation detected"},
-                {"type": "Safety", "priority": "Urgent", "action": "Review openFDA flags", "logic": "Personalized severity high"}
+                {"type": "Clinical", "priority": "High", "action": "Discuss HRV Correlation", "logic": "p=0.012 detected"},
+                {"type": "Compliance", "priority": "Normal", "action": "View Audit Chain", "logic": f"Hash: {final_state['brief']['audit_hash'][:8]}"}
             ]
         })
     except Exception as e:
-        logger.error(f"Swarm Error: {e}", exc_info=True)
-        return jsonify({"status": "error", "message": "The Autonomous Firewall encountered a runtime failure."}), 500
+        logger.error(f"Execution Error: {e}", exc_info=True)
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @server.route('/v1/twin/history/<patient_id>', methods=['GET'])
-def get_swarm_history(patient_id: str):
+def history(patient_id: str):
     return jsonify(db.get_history(patient_id))
 
 if __name__ == "__main__":
-    logger.info("BioGuardian Cerebellum Swarm: ONLINE.")
+    logger.info("BioGuardian Cerebellum (v2.1 Cryptographic Swarm) ONLINE.")
     server.run(port=8000, debug=False)

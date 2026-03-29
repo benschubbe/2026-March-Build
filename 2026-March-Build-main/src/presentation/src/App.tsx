@@ -11,7 +11,8 @@ import {
   Lock, 
   Cpu, 
   History as HistoryIcon,
-  Play
+  Play,
+  Shield
 } from 'lucide-react';
 import TwinModel from './components/TwinModel';
 import MetabolicChart from './components/MetabolicChart';
@@ -19,6 +20,7 @@ import HistoryView from './components/HistoryView';
 import ScenarioView from './components/ScenarioView'; 
 import SettingsView from './components/SettingsView';
 import PhysicianBriefView from './components/PhysicianBriefView';
+import AuditTrailView from './components/AuditTrailView';
 import './App.css';
 
 // --- Environment Configuration ---
@@ -32,18 +34,19 @@ type AppView = 'dashboard' | 'history' | 'scenarios' | 'settings';
 
 function App() {
   const [currentView, setCurrentView] = useState<AppView>('dashboard');
-  const [bioState, setBioState] = useState({ glucose: 100, source: 'Initializing...', patient_id: 'PT-2026-ALPHA' });
+  const [bioState, setBioState] = useState({ glucose: 100, source: 'Sarah_M_47 (Ready)', patient_id: 'SARAH-ALPHA-2025' });
   const [chartData, setChartData] = useState<{time: string, value: number}[]>([]);
   const [resilience, setResilience] = useState(94.2);
   const [simResults, setSimResults] = useState<AgentInsight[]>([]);
   const [brief, setBrief] = useState<any>(null);
+  const [auditTrail, setAuditTrail] = useState<string[]>([]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([
-    { type: 'Safety', priority: 'High', action: 'Monitor Cortisol', logic: 'Simulated spike detected in stress-loop.' }
+    { type: 'Status', priority: 'Low', action: 'Firewall Active', logic: 'Topology-based privacy: ON' }
   ]);
   const [isLoading, setIsLoading] = useState(false);
   
-  const [selectedDrug, setSelectedDrug] = useState('Metformin');
-  const [dosage, setDosage] = useState(500);
+  const [selectedDrug, setSelectedDrug] = useState('Atorvastatin');
+  const [dosage, setDosage] = useState(20);
 
   const socketRef = useRef<Socket | null>(null);
 
@@ -51,10 +54,10 @@ function App() {
     socketRef.current = io(WS_URL);
     
     socketRef.current.on('telemetry-update', (data) => {
-      setBioState({ glucose: data.value, source: data.source, patient_id: data.patient_id });
+      setBioState(prev => ({ ...prev, glucose: data.value }));
       setChartData(prev => {
         const newData = [...prev, { time: new Date().toLocaleTimeString(), value: data.value }];
-        return newData.slice(-20); // Keep last 20 points
+        return newData.slice(-20); 
       });
     });
 
@@ -63,16 +66,18 @@ function App() {
 
   const triggerRehearsal = async () => {
     setIsLoading(true);
+    setSimResults([]);
+    setBrief(null);
+    setAuditTrail([]);
     try {
-      const payload: any = {
+      const response = await axios.post(`${API_BASE_URL}/v1/simulation/rehearse`, {
         patient_id: bioState.patient_id,
         intervention: { drug: selectedDrug, dose: dosage },
-      };
-
-      const response = await axios.post(`${API_BASE_URL}/v1/simulation/rehearse`, payload);
+      });
       
       setSimResults(response.data.report);
       setBrief(response.data.brief);
+      setAuditTrail(response.data.audit_trail);
       setResilience(Number((response.data.resilience * 100).toFixed(1)));
       setRecommendations(response.data.recommendations);
     } catch (err) { 
@@ -90,27 +95,27 @@ function App() {
           <span>BioGuardian</span>
         </div>
         <div className="Nav-Items">
-          <div className={`Nav-Item ${currentView === 'dashboard' ? 'active' : ''}`} onClick={() => setCurrentView('dashboard')}><Activity size={20} /> Dashboard</div>
+          <div className={`Nav-Item ${currentView === 'dashboard' ? 'active' : ''}`} onClick={() => setCurrentView('dashboard')}><Activity size={20} /> Sarah's Twin</div>
           <div className={`Nav-Item ${currentView === 'history' ? 'active' : ''}`} onClick={() => setCurrentView('history')}><HistoryIcon size={20} /> History</div>
-          <div className={`Nav-Item ${currentView === 'scenarios' ? 'active' : ''}`} onClick={() => setCurrentView('scenarios')}><Zap size={20} /> Scenarios</div>
-          <div className={`Nav-Item ${currentView === 'settings' ? 'active' : ''}`} onClick={() => setCurrentView('settings')}><SettingsIcon size={20} /> System</div>
+          <div className={`Nav-Item ${currentView === 'scenarios' ? 'active' : ''}`} onClick={() => setCurrentView('scenarios')}><Zap size={20} /> Protocols</div>
+          <div className={`Nav-Item ${currentView === 'settings' ? 'active' : ''}`} onClick={() => setCurrentView('settings')}><SettingsIcon size={20} /> Privacy</div>
         </div>
         <div className="Privacy-Indicator">
           <Lock size={14} />
-          <span>E2E Encrypted</span>
+          <span>SARAH: LOCAL_ONLY</span>
         </div>
       </nav>
 
       <main className="Main-Content">
         <header className="Top-Bar">
           <div className="Header-Left">
-            <h1>Patient Twin Overview</h1>
-            <span className="Patient-Badge">{bioState.patient_id} • Metabolic Focus</span>
+            <h1>Autonomous Biological Firewall</h1>
+            <span className="Patient-Badge">{bioState.source} • Multi-Step Reasoning active</span>
           </div>
           <div className="Header-Right">
             {currentView === 'dashboard' && (
-              <button className={`Rehearse-Btn ${isLoading ? 'loading' : ''}`} onClick={triggerRehearsal}>
-                {isLoading ? 'Processing...' : <><Play size={16} fill="currentColor"/> Run Rehearsal</>}
+              <button className={`Rehearse-Btn ${isLoading ? 'loading' : ''}`} onClick={triggerRehearsal} disabled={isLoading}>
+                {isLoading ? 'The Swarm is Reasoning...' : <><Play size={16} fill="currentColor"/> Execute Swarm</>}
               </button>
             )}
           </div>
@@ -124,7 +129,7 @@ function App() {
                   <Cpu size={18} />
                   <h3>Neural Soma Visualizer</h3>
                 </div>
-                <span className="Live-Tag">LIVE STREAM</span>
+                <span className="Live-Tag">SYNCED</span>
               </div>
               <div className="Visualizer-Container">
                 <Canvas camera={{ position: [0, 0, 4], fov: 45 }}>
@@ -141,7 +146,7 @@ function App() {
               <div className="Card Stat-Card highlight-blue">
                 <div className="Stat-Icon"><Activity size={24} /></div>
                 <div className="Stat-Info">
-                  <label>Glucose Level</label>
+                  <label>Current Glucose</label>
                   <div className="Value-Group">
                     <span className="Value">{bioState.glucose.toFixed(1)}</span>
                     <span className="Unit">mg/dL</span>
@@ -152,7 +157,7 @@ function App() {
               <div className="Card Stat-Card highlight-green">
                 <div className="Stat-Icon"><ShieldCheck size={24} /></div>
                 <div className="Stat-Info">
-                  <label>System Resilience</label>
+                  <label>Biological Integrity</label>
                   <div className="Value-Group">
                     <span className="Value">{resilience}%</span>
                   </div>
@@ -161,18 +166,18 @@ function App() {
 
               <div className="Card Controls-Card">
                 <div className="Card-Header">
-                  <h3>Swarm Intervention</h3>
+                  <h3>Protocol Event Input</h3>
                 </div>
                 <div className="Control-Groups">
                   <div className="Group">
-                    <label>Agent</label>
+                    <label>Substance</label>
                     <select value={selectedDrug} onChange={(e) => setSelectedDrug(e.target.value)}>
+                      <option value="Atorvastatin">Atorvastatin</option>
                       <option value="Metformin">Metformin</option>
-                      <option value="Lisinopril">Lisinopril</option>
                     </select>
                   </div>
                   <div className="Group">
-                    <label>Dosage (mg)</label>
+                    <label>Dose (mg)</label>
                     <input type="number" value={dosage} onChange={(e) => setDosage(Number(e.target.value))} />
                   </div>
                 </div>
@@ -181,19 +186,19 @@ function App() {
 
             <div className="Card Chart-Card">
               <div className="Card-Header">
-                <h3>Metabolic Trend (Real-time)</h3>
+                <h3>Biometric Drift (Pearson r Analysis)</h3>
               </div>
               <MetabolicChart data={chartData} />
             </div>
 
             <div className="Card Recommendations-Card">
               <div className="Card-Header">
-                <h3>Guardian Insights</h3>
+                <h3>Firewall Status</h3>
               </div>
               <div className="Rec-List">
                 {recommendations.map((rec, i) => (
                   <div key={i} className={`Rec-Item ${rec.type.toLowerCase()}`}>
-                    <div className="Rec-Meta">{rec.type} • {rec.priority}</div>
+                    <div className="Rec-Meta">{rec.type} • PRIORITY_{rec.priority.toUpperCase()}</div>
                     <div className="Rec-Body">{rec.action}</div>
                     <div className="Rec-Footer">{rec.logic}</div>
                   </div>
@@ -203,7 +208,7 @@ function App() {
 
             <div className="Card Console-Card">
               <div className="Card-Header">
-                <h3>Swarm Analysis Console</h3>
+                <h3>Agent Swarm Reasoning Trace</h3>
               </div>
               <div className="Console-Output">
                 {simResults.length > 0 ? simResults.map((result, i) => (
@@ -212,30 +217,28 @@ function App() {
                     <span className="Agent-Message">{result.insight}</span>
                   </div>
                 )) : (
-                  <div className="Empty-State">Biological Firewall Standby. Run Swarm Rehearsal.</div>
+                  <div className="Empty-State">Standby. Awaiting protocol event execution.</div>
                 )}
               </div>
             </div>
 
             {brief && (
-              <div style={{ gridColumn: 'span 3' }}>
+              <div style={{ gridColumn: 'span 2' }}>
                 <PhysicianBriefView brief={brief} />
+              </div>
+            )}
+            
+            {auditTrail.length > 0 && (
+              <div style={{ gridColumn: 'span 1' }}>
+                <AuditTrailView hashes={auditTrail} />
               </div>
             )}
           </section>
         )}
 
-        {currentView === 'history' && (
-          <HistoryView patientId={bioState.patient_id} />
-        )}
-
-        {currentView === 'scenarios' && (
-          <ScenarioView />
-        )}
-
-        {currentView === 'settings' && (
-          <SettingsView />
-        )}
+        {currentView === 'history' && <HistoryView patientId={bioState.patient_id} />}
+        {currentView === 'scenarios' && <ScenarioView />}
+        {currentView === 'settings' && <SettingsView />}
       </main>
     </div>
   );

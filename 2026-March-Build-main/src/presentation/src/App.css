@@ -1015,3 +1015,92 @@ body {
   font-size: 0.6rem !important;
   opacity: 0.5;
 }
+
+/* Audit Trail View Styles */
+.AuditTrail-Container {
+  padding: 1.5rem;
+  background: #010409 !important;
+  border-color: #238636 !important; /* GitHub Success Green */
+}
+
+.Audit-Header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 0.75rem;
+}
+
+.Audit-Header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #3fb950;
+}
+
+.audit-desc {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin-bottom: 1.5rem;
+}
+
+.Hash-Chain {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.Hash-Node {
+  position: relative;
+  background: rgba(255,255,255,0.02);
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+.Node-Status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.node-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.hash-value {
+  display: block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.7rem;
+  color: #c9d1d9;
+  word-break: break-all;
+}
+
+.Hash-Link {
+  position: absolute;
+  left: 18px;
+  bottom: -10px;
+  width: 2px;
+  height: 10px;
+  background: #238636;
+  opacity: 0.5;
+}
+
+.Final-Verification {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #3fb950;
+  padding: 10px;
+  background: rgba(63, 185, 80, 0.05);
+  border-radius: 6px;
+}
+
+.success-text { color: #3fb950; }
+.accent-green { color: #3fb950; }
