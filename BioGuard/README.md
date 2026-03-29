@@ -49,21 +49,30 @@ All processing runs locally. No central server. No PHI transmitted externally.
 
 Every output PASS carries the auditor version hash. Every BLOCK carries the specific rule code.
 
+## Running the Demo
+
+```bash
+# Run the full pipeline — produces a complete Physician Brief
+python demo.py
+
+# Run with custom inputs
+python demo.py --patient PT-CUSTOM --drug Simvastatin --dose 40mg
+```
+
+Output: SOAP-structured Physician Brief with lab panels, drug flags, Pearson correlation signals, compliance validation, and sealed audit chain. Full JSON written to `demo_output.json`.
+
 ## Testing
 
 ```bash
-# 91 tests across 3 test suites
+# 115 tests across 4 test suites — all passing
+python -m pytest src/orchestration/tests/ -v
+
+# Individual suites
+python -m pytest src/orchestration/tests/test_pipeline.py -v      # 10 tests — end-to-end pipeline
 python -m pytest src/orchestration/tests/test_auditor.py -v        # 74 tests — compliance rules
 python -m pytest src/orchestration/tests/test_correlation.py -v    # 17 tests — Pearson statistics
+python -m pytest src/orchestration/tests/test_vector_store.py -v   # 14 tests — vector store + MCP
 ```
-
-## Demo Flow
-
-1. **Lab Text -> LOINC JSON** (The Scribe): Text parsed via LOINC lookup + vector store RAG
-2. **Drug -> openFDA Flags** (The Pharmacist): Live api.fda.gov query, CK-personalised risk
-3. **Biometrics -> Pearson r** (Correlation Engine): NumPy computation, p < 0.05 threshold
-4. **Compliance Gate** (Auditor): 47 rules validated, intentional block demonstrated
-5. **Physician Brief** (SOAP output): Structured, EHR-pasteable, audit hash sealed
 
 ## Stack
 

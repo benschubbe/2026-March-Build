@@ -19,3 +19,8 @@ dist/
 build/
 .next/
 out/
+
+# Runtime artifacts
+demo_output.json
+*.db
+*.jsonl
