@@ -34,6 +34,7 @@ from orchestration.auditor.engine import AuditChain, ComplianceEngine
 from orchestration.correlation_engine import (
     analyze_biometric_correlation,
     generate_sarah_scenario_data,
+    run_full_analysis,
 )
 from orchestration.lab_parser import generate_sarah_labs, parse_lab_text, LOINC_TABLE
 from orchestration.mcp_server import MCPServer
@@ -138,59 +139,68 @@ def run_pipeline(
         fda_source=fda_result.get("source"))
 
     # ------------------------------------------------------------------
-    # Stage 3: The Correlation Engine
+    # Stage 3: The Correlation Engine (pharmacovigilance-grade)
     # ------------------------------------------------------------------
-    scenario = generate_sarah_scenario_data()
+    report = run_full_analysis(patient_id, substance)
     signals = []
 
-    hrv_result = analyze_biometric_correlation(
-        scenario["hrv"].tolist(), scenario["hours_since_dose"].tolist(),
-        "HRV_RMSSD", "evening_dose", 96)
-    if hrv_result and hrv_result.significant:
+    for corr in report.correlations:
         signals.append({
-            "biometric": hrv_result.biometric,
-            "protocol_event": hrv_result.protocol_event,
-            "pearson_r": hrv_result.pearson_r,
-            "p_value": max(0.001, hrv_result.p_value),
-            "confidence_interval": {"lower": hrv_result.ci_lower, "upper": hrv_result.ci_upper},
-            "window_hours": hrv_result.window_hours,
-            "severity": hrv_result.severity,
+            "biometric": corr.biometric,
+            "protocol_event": corr.protocol_event,
+            "pearson_r": corr.pearson_r,
+            "p_value": max(0.001, corr.p_value),
+            "confidence_interval": {"lower": corr.ci_lower, "upper": corr.ci_upper},
+            "window_hours": corr.window_hours,
+            "severity": corr.severity,
         })
 
-    sleep_result = analyze_biometric_correlation(
-        scenario["sleep"].tolist(),
-        np.arange(len(scenario["sleep"]), dtype=np.float64).tolist(),
-        "SLEEP_ANALYSIS", "evening_dose", 96)
-    if sleep_result and sleep_result.significant:
-        signals.append({
-            "biometric": sleep_result.biometric,
-            "protocol_event": sleep_result.protocol_event,
-            "pearson_r": sleep_result.pearson_r,
-            "p_value": max(0.001, sleep_result.p_value),
-            "confidence_interval": {"lower": sleep_result.ci_lower, "upper": sleep_result.ci_upper},
-            "window_hours": sleep_result.window_hours,
-            "severity": sleep_result.severity,
-        })
+    # Baseline comparisons feed into the SOAP note
+    baseline_findings = []
+    for bc in report.baseline_comparisons:
+        if bc.clinically_significant:
+            baseline_findings.append(
+                "%s: %.1f -> %.1f (%+.1f%%, d=%.2f, Welch p=%.4f)" % (
+                    bc.biometric, bc.baseline_mean, bc.observation_mean,
+                    bc.percent_change, bc.cohens_d, bc.welch_p))
 
-    glucose_result = analyze_biometric_correlation(
-        scenario["glucose"].tolist(),
-        np.arange(len(scenario["glucose"]), dtype=np.float64).tolist(),
-        "BLOOD_GLUCOSE", "evening_dose", 96)
+    # Post-dose window findings
+    window_findings = []
+    for pw in report.post_dose_windows:
+        if pw.significant:
+            window_findings.append(
+                "%s [%d-%dh post-dose]: %.1f vs %.1f (%+.1f%%, d=%.2f, p=%.4f)" % (
+                    pw.biometric, pw.window_start_h, pw.window_end_h,
+                    pw.in_window_mean, pw.out_window_mean,
+                    pw.depression_pct, pw.cohens_d, pw.welch_p))
 
-    suppressed = 1 if (glucose_result and not glucose_result.significant) else 0
-    audit.log("The Correlation Engine", "HealthKit_96h", signals)
+    audit.log("The Correlation Engine", "multi_stream_96h", {
+        "correlations": len(report.correlations),
+        "baselines": len(report.baseline_comparisons),
+        "windows": len(report.post_dose_windows),
+        "bonferroni_alpha": report.bonferroni_alpha,
+    })
+
     primary = signals[0] if signals else None
-    log("The Correlation Engine",
-        "NumPy Pearson: %d significant, %d suppressed. Primary: %s r=%.4f p=%.6f 95%%CI [%.2f, %.2f]." % (
-            len(signals), suppressed,
-            primary["biometric"] if primary else "N/A",
-            primary["pearson_r"] if primary else 0,
-            primary["p_value"] if primary else 1,
-            primary["confidence_interval"]["lower"] if primary else 0,
-            primary["confidence_interval"]["upper"] if primary else 0,
-        ) if primary else "No significant signals detected.",
-        confidence=0.91, signals=len(signals), suppressed=suppressed,
-        computation="numpy_pearsonr")
+    log_parts = [
+        "Multi-stream analysis: %d biometrics, %d tests, Bonferroni alpha=%.4f." % (
+            3, report.tests_performed, report.bonferroni_alpha),
+        "%d correlation(s) survived correction, %d suppressed." % (
+            report.signals_emitted, report.signals_suppressed),
+    ]
+    if primary:
+        log_parts.append("Primary: %s r=%.4f p=%.6f CI [%.2f, %.2f]." % (
+            primary["biometric"], primary["pearson_r"], primary["p_value"],
+            primary["confidence_interval"]["lower"], primary["confidence_interval"]["upper"]))
+    if baseline_findings:
+        log_parts.append("Baseline shifts: " + "; ".join(baseline_findings) + ".")
+    if window_findings:
+        log_parts.append("Post-dose windows: " + "; ".join(window_findings) + ".")
+
+    log("The Correlation Engine", " ".join(log_parts),
+        confidence=0.91, signals=len(signals), suppressed=report.signals_suppressed,
+        computation="numpy_pearsonr+welch_t+cohens_d",
+        bonferroni_alpha=report.bonferroni_alpha)
 
     # ------------------------------------------------------------------
     # Stage 4: The Compliance Auditor
@@ -210,24 +220,31 @@ def run_pipeline(
     audit_hash = sha256_json(chain)
     integrity = audit.verify_integrity()
 
-    # Build SOAP note
+    # Build SOAP note with pharmacovigilance-grade detail
     soap_parts = [
         "S: Patient reports initiation of %s %s alongside existing protocol." % (substance, dose),
     ]
+    obj_parts = []
     if primary:
-        soap_parts.append(
-            "O: %s showed correlation r=%.2f (p=%.4f) over %dh post-dose window." % (
+        obj_parts.append(
+            "%s correlation r=%.2f (p=%.4f, 95%% CI [%.2f, %.2f]) over %dh window" % (
                 primary["biometric"], primary["pearson_r"], primary["p_value"],
+                primary["confidence_interval"]["lower"], primary["confidence_interval"]["upper"],
                 primary["window_hours"]))
+    if baseline_findings:
+        obj_parts.append("Baseline shifts: " + "; ".join(baseline_findings))
+    if window_findings:
+        obj_parts.append("Post-dose window: " + "; ".join(window_findings))
     if abnormal:
-        soap_parts.append("Lab: " + "; ".join(
+        obj_parts.append("Lab: " + "; ".join(
             "%s %s%s (ref %s-%s)" % (p["display_name"], p["value"], p["unit"],
                                       p["reference_range"]["low"], p["reference_range"]["high"])
             for p in abnormal))
+    soap_parts.append("O: " + ". ".join(obj_parts) + "." if obj_parts else "O: No significant findings.")
     soap_parts.append(
-        "A: Correlation flagged for physician review. "
-        "openFDA data supports clinical discussion. "
-        "Correlation does not establish causation.")
+        "A: Multi-stream pharmacovigilance analysis with Bonferroni correction (alpha=%.4f). "
+        "Correlation flagged for physician review. openFDA FAERS data supports clinical discussion. "
+        "Correlation does not establish causation." % report.bonferroni_alpha)
     soap_parts.append(
         "P: Discuss findings with care team. "
         "Professional consultation strongly recommended.")
