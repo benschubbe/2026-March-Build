@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { History as HistoryIcon, Activity, FlaskConical, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { History as HistoryIcon, Activity, FlaskConical } from 'lucide-react';
 import moment from 'moment';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';

@@ -7,13 +7,11 @@ import {
   Activity, 
   ShieldCheck, 
   Zap, 
-  AlertTriangle, 
   Settings as SettingsIcon, 
   Lock, 
   Cpu, 
   History as HistoryIcon,
-  Play,
-  FileText
+  Play
 } from 'lucide-react';
 import TwinModel from './components/TwinModel';
 import MetabolicChart from './components/MetabolicChart';
@@ -37,7 +35,6 @@ function App() {
   const [bioState, setBioState] = useState({ glucose: 100, source: 'Initializing...', patient_id: 'PT-2026-ALPHA' });
   const [chartData, setChartData] = useState<{time: string, value: number}[]>([]);
   const [resilience, setResilience] = useState(94.2);
-  const [surgicalRisk, setSurgicalRisk] = useState(0.85);
   const [simResults, setSimResults] = useState<AgentInsight[]>([]);
   const [brief, setBrief] = useState<any>(null);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([
@@ -45,7 +42,6 @@ function App() {
   ]);
   const [isLoading, setIsLoading] = useState(false);
   
-  const [selectedInterventionType, setSelectedInterventionType] = useState('medication');
   const [selectedDrug, setSelectedDrug] = useState('Metformin');
   const [dosage, setDosage] = useState(500);
 
