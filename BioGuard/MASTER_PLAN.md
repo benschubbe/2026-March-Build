@@ -76,13 +76,13 @@ Orchestration uses LangGraph — a stateful directed graph with conditional rout
 
 Protocol layer uses Model Context Protocol — typed tool schemas with sandboxed processes make agents hot-swappable against their interface contracts. Custom RPC would require rebuilding what MCP provides and would eliminate the interoperability guarantees that make the plugin marketplace possible at Layer 2. The MCP server exposes a /v1/mcp/tools discovery endpoint where third-party agent publishers can query available tool schemas, validate their input/output contracts against the published JSON Schema definitions, and register new agents via register_tool() — the Compliance Auditor validates compatibility as a non-negotiable listing requirement before any agent is added to the swarm.
 
-LLM inference: The hackathon build uses server-side Flask orchestration to demonstrate the agent pipeline. The target production deployment uses Llama-3 8B via MLC LLM (4-bit GPTQ, benchmarked at 1.4s on iPhone 14 Pro) — this is a Layer 2 migration that requires no agent code changes because all agent logic is encapsulated behind MCP tool schemas. The hackathon demo proves the agent architecture, statistical pipeline, and compliance gate; the on-device inference migration is an infrastructure change, not an architecture change.
+LLM inference: Server-side Flask orchestration with LangGraph. All agent logic is encapsulated behind MCP tool schemas, making the inference backend swappable without agent code changes.
 
-Vector store is an embedded NumPy-based cosine similarity store (vector_store.py) with 20 LOINC-coded clinical reference embeddings, using character trigram hashing for deterministic text vectors. The store provides sub-millisecond retrieval with zero server process, zero external dependency, and zero-copy vectorized operations. In Layer 2, this upgrades to LanceDB with Apache Arrow zero-copy memory mapping — the API contract is identical so the upgrade requires no calling code changes.
+Vector store is an embedded NumPy-based cosine similarity store (vector_store.py) with 20 LOINC-coded clinical reference embeddings, using character trigram hashing for deterministic text vectors. The store provides sub-millisecond retrieval with zero server process and zero external dependency.
 
-Lab parsing uses a text-based LOINC normalization pipeline (lab_parser.py) with a 20-entry reference table covering the most common CBC/CMP panels, regex-based value extraction, and SHA-256 source hashing. The parser accepts raw text from any source (OCR output, direct text entry, CSV) and produces typed LabPanel records. In Layer 2, Tesseract 5.0 OCR with custom layout post-processing replaces the text input with direct PDF ingestion — the parser's output contract is unchanged.
+Lab parsing uses a text-based LOINC normalization pipeline (lab_parser.py) with a 20-entry reference table covering the most common CBC/CMP panels, regex-based value extraction, and SHA-256 source hashing. The parser accepts raw text from any source and produces typed LabPanel records.
 
-Frontend is a React + TypeScript web dashboard (presentation layer) with Three.js 3D visualization, Recharts biometric charting, Socket.IO real-time telemetry, and a SOAP-structured Physician Brief renderer (PhysicianBriefView.tsx). The hackathon build demonstrates the full agent pipeline via web interface. In Layer 2, a React Native mobile shell with a Swift HealthKit bridge provides native iOS access to HRV_RMSSD, SLEEP_ANALYSIS, BLOOD_GLUCOSE, STEP_COUNT, and RESTING_HEART_RATE. For the hackathon, biometric data enters via the gRPC mock producer (mock_producer.js) which simulates the HealthKit data stream with physiologically realistic noise.
+Frontend is a React + TypeScript web dashboard (presentation layer) with Three.js 3D visualization, Recharts biometric charting, Socket.IO real-time telemetry, and a SOAP-structured Physician Brief renderer (PhysicianBriefView.tsx). Biometric data enters via the gRPC mock producer (mock_producer.js) which simulates a HealthKit-equivalent data stream with physiologically realistic Box-Muller Gaussian noise across 5 biometric types.
 
 External APIs are openFDA and PubMed E-utilities — read-only, zero PHI transmitted. The openFDA adverse events endpoint provides 18 million+ individual case safety reports; this is the signal density source that makes personalized pharmacovigilance possible at individual scale.
 
@@ -130,7 +130,7 @@ The MCP server runs in a sandboxed process on-device. Agents communicate exclusi
 
 The Four-Agent Swarm:
 
-The Scribe (lab_parser.py + vector_store.py) takes lab report text and produces LOINC-normalized JSON. A 20-entry LOINC reference table with regex-based value extraction handles Quest and LabCorp panel formats. RAG retrieval grounds ambiguous values against reference range embeddings stored in the embedded vector store (20 LOINC-coded clinical reference entries with cosine similarity matching). Source text hash is stored in the audit chain. The parser accepts raw text from OCR output, direct entry, or CSV — the input interface is format-agnostic so that Tesseract OCR can be added at Layer 2 without changing the parsing pipeline.
+The Scribe (lab_parser.py + vector_store.py) takes lab report text and produces LOINC-normalized JSON. A 20-entry LOINC reference table with regex-based value extraction handles Quest and LabCorp panel formats. RAG retrieval grounds ambiguous values against reference range embeddings stored in the embedded vector store (20 LOINC-coded clinical reference entries with cosine similarity matching). Source text hash is stored in the audit chain. The parser accepts raw text from any source and produces typed LabPanel records.
 
 The Pharmacist takes drug and supplement names plus lab JSON and produces contraindication flags with severity scores. Drug names are first normalized against RxNorm (cached local dictionary of 500 common medications, with API fallback for cache misses) to resolve brand/generic/misspelling ambiguity. It then queries openFDA adverse events AND drug label endpoints separately, cross-referencing against the user's specific LOINC markers for personalized rather than population-level risk. A statin flag for a patient with normal CK levels is scored differently than the same flag for a patient with elevated CK — the personalization is in the cross-reference, not the lookup.
 
@@ -155,7 +155,7 @@ First: Deterministic compliance as a typed architectural primitive. The field ha
 
 Second: MCP as a clinical data contract layer. MCP was released in November 2024 as a tool-use protocol for AI agents. BioGuardian is the first system to apply it as a health data interoperability layer — using typed MCP tool schemas to enforce clinical data contracts between agents with the same rigor that HL7 FHIR enforces contracts between EHR systems. The discovery mechanism at /v1/mcp/tools enables third-party agent publishers to validate compatibility before deployment.
 
-Third: Pharmacovigilance-grade statistics at personal scale, on consumer hardware. Post-market drug surveillance uses population-level Pearson correlations and p-value thresholds to detect adverse signals in cohorts of thousands. BioGuardian applies this exact methodology — with identical statistical rigor (NumPy Pearson r, Fisher z-transform confidence intervals, t-distribution p-values) and identical p-value suppression thresholds — to a single patient's longitudinal biometric data, running on-device in 1.4 seconds.
+Third: Pharmacovigilance-grade statistics at personal scale. Post-market drug surveillance uses population-level Pearson correlations and p-value thresholds to detect adverse signals in cohorts of thousands. BioGuardian applies this exact methodology — with identical statistical rigor (NumPy Pearson r, Fisher z-transform confidence intervals, t-distribution p-values) and identical p-value suppression thresholds — to a single patient's longitudinal biometric data.
 
 Fourth: The Physician Brief as a distribution architecture. Every AI health product generates output for patients. BioGuardian generates output for physicians — in SOAP-note-adjacent format, EHR-pasteable, clinically structured, arriving before the appointment rather than during it. The product's core output is simultaneously its B2B acquisition channel, its clinical validation mechanism, and the seed of its physician network effect.
 
@@ -168,7 +168,7 @@ This section governs the 24-hour build. It is the contract the team operates und
 
 Team Roles and Owners:
 
-- AI Lead / CTO: Orchestration, Scribe, Pharmacist agents; LangGraph wiring; MCP server; on-device LLM inference. Primary deliverables: agents/scribe.py, agents/pharmacist.py, orchestrator/graph.py, mcp/server.py
+- AI Lead / CTO: Orchestration, Scribe, Pharmacist agents; LangGraph wiring; MCP server. Primary deliverables: main.py, lab_parser.py, openfda_client.py, mcp_server.py
 - Full-Stack Developer: React web dashboard, 3D visualization, gRPC telemetry gateway, Brief renderer component, end-to-end integration. Primary deliverables: presentation/src/App.tsx, components/PhysicianBriefView.tsx, ingestion/server.js
 - Data Scientist: Correlation Engine, statistical validation, synthetic patient dataset, p-value suppression logic. Primary deliverables: agents/correlation_engine.py, data/synthetic_patient.csv, tests/test_statistics.py
 - Regulatory Lead: Compliance Auditor predicate YAML, unit tests for all 47 rules, audit chain logger, scope enforcement. Primary deliverables: auditor/rules.yaml, auditor/auditor.py, tests/test_auditor.py
@@ -177,7 +177,7 @@ Milestone Schedule:
 
 HOUR 0-2 | ALL HANDS — Schema Lock & Go/No-Go
 - Pydantic schemas reviewed, merged, committed (schemas.py)
-- LLM latency confirmed on demo device (target: <=1.4s)
+- Agent pipeline latency confirmed (target: <=3s end-to-end)
 - All user-facing strings reviewed for diagnostic language
 - Scope document signed — Family Risk Guard and cloud sync are OUT
 - Roles confirmed, fallback CSVs and cached API responses committed
@@ -246,11 +246,11 @@ IN SCOPE for this hackathon:
 - Mock agent stubs: pre-committed integration fallbacks for Hour 14 escalation
 
 OUT OF SCOPE (roadmap only — will not be touched during build):
-- On-device LLM inference (MLC LLM / Llama-3 8B) — requires iOS deployment; hackathon uses server-side Flask
-- Swift HealthKit bridge — requires physical iOS device; mock_producer.js substitutes with identical data contract
-- React Native mobile shell — hackathon uses React web dashboard; mobile shell is Layer 2
-- Tesseract OCR pipeline — lab_parser.py handles text input; PDF OCR is Layer 2
-- react-pdf Physician Brief renderer — PhysicianBriefView.tsx renders in-browser; PDF export is Layer 2
+- On-device inference — hackathon uses server-side Flask; agent architecture is backend-agnostic
+- Native mobile HealthKit integration — mock_producer.js substitutes with identical data contract
+- Native mobile shell — hackathon uses React web dashboard
+- PDF OCR ingestion — lab_parser.py handles text input
+- PDF export of Physician Brief — PhysicianBriefView.tsx renders in-browser
 - Family Risk Guard
 - Cloud sync / encrypted cloud backup
 - Telehealth pre-booking integration
@@ -283,8 +283,8 @@ Why this team can ship this in 24 hours:
 
 The founding team was not assembled for BioGuardian — BioGuardian was designed around what this team already does in production.
 
-- AI Lead / CTO: Shipped a production LangGraph multi-agent deployment handling 400,000 monthly inference calls. Built on-device LLM inference pipeline for iOS shipped to 40,000 users in 2024. Integrated MCP protocol from the November 2024 release. The 1.4-second benchmark is measured, not estimated. Estimated time to working orchestration: 4 hours.
-- Full-Stack Developer: Built and shipped React + TypeScript dashboards for two prior digital health apps. Completed FHIR R4 data integration for Epic. Built the gRPC telemetry gateway and FHIR R4 normalizer (server.js, normalizer.js). Estimated time to working web dashboard with 3D visualization: 3 hours.
+- AI Lead / CTO: Shipped a production LangGraph multi-agent deployment handling 400,000 monthly inference calls. Integrated MCP protocol from the November 2024 release. Built the four-agent swarm orchestrator, openFDA client, and MCP server. Estimated time to working orchestration: 4 hours.
+- Full-Stack Developer: Built and shipped React + TypeScript dashboards for two prior digital health apps. Completed FHIR R4 data integration. Built the gRPC telemetry gateway and FHIR R4 normalizer (server.js, normalizer.js), React dashboard with Three.js 3D visualization and PhysicianBriefView.tsx. Estimated time to working web dashboard: 3 hours.
 - Data Scientist: Three years on the pharmacovigilance team at Roche building time-series anomaly detection on post-market drug surveillance data. The Correlation Engine directly adapts that pipeline using NumPy Pearson correlation and Fisher z-transform confidence intervals. The 87% flagging accuracy is a validated result on 200 synthetic patient trajectories. Estimated time to working agent: 3 hours.
 - Regulatory Lead: Authored FDA General Wellness documentation for two prior products reviewed and accepted without objection. The Compliance Auditor's 47 predicate rules were drafted against the General Wellness policy text before a line of product code was written. Estimated time to working auditor config: 2 hours.
 
@@ -423,10 +423,10 @@ Layer 2 — Post-MVP (Months 3-9):
 - FHIR R4 direct-pull for Epic and Cerner: The Scribe receives structured FHIR bundles instead of OCR'd PDFs, raising extraction accuracy from 94% to 99.8%
 - Telehealth pre-booking via Teladoc API pre-populated with brief context
 - Lab panel ordering via Quest Diagnostics order API
-- Vector store upgrade from NumPy embedded store to LanceDB with Apache Arrow zero-copy memory mapping (API contract designed for this upgrade — no calling code changes)
-- On-device LLM migration: Flask server-side orchestration moves to MLC LLM on-device inference (architecture already agent-agnostic via MCP)
-- React Native mobile shell with Swift HealthKit bridge (replacing web dashboard for iOS deployment)
-- Tesseract 5.0 OCR for direct PDF ingestion (replacing text-based lab_parser input)
+- On-device inference migration (architecture already agent-agnostic via MCP tool schemas)
+- Native mobile shell with HealthKit bridge (replacing web dashboard)
+- Direct PDF OCR ingestion (replacing text-based lab_parser input)
+- Vector store scaling for larger embedding sets
 
 Layer 3 — Platform (Year 1+):
 - BioGuardian API: white-label Physician Brief generation engine licensed to clinical networks, PBMs, and insurers

@@ -7,7 +7,7 @@
  * Responsibilities:
  *   1. Accept streaming biometric telemetry via gRPC (HealthKit proxy, CGM, manual CSV)
  *   2. Normalize every observation to FHIR R4 / LOINC before any downstream processing
- *   3. Emit real-time updates to the React Native frontend via WebSocket
+ *   3. Emit real-time updates to the React frontend via WebSocket
  *   4. Forward batched, normalized payloads to the LangGraph orchestration layer
  *   5. Append every ingestion event to the SHA-256 audit chain (local, on-device)
  *   6. Enforce typed IngestionPayload contracts (mirrors Pydantic schemas in Python layer)
@@ -245,7 +245,7 @@ try {
 const httpServer = createServer();
 const io = new SocketIOServer(httpServer, {
     cors: {
-        // In production (post-hackathon), restrict this to the React Native app's origin.
+        // In production (post-hackathon), restrict this to the React app's origin.
         // For the demo, wildcard is acceptable on-device.
         origin: process.env.WS_CORS_ORIGIN || '*',
         methods: ['GET', 'POST'],
@@ -353,7 +353,7 @@ function scheduleBatchFlush() {
  * Per-packet pipeline:
  *   1. Validate against BiometricStream contract
  *   2. Normalize to FHIR R4 Observation (LOINC-coded)
- *   3. Emit to React Native frontend via WebSocket
+ *   3. Emit to React frontend via WebSocket
  *   4. Append to local audit chain
  *   5. Enqueue in batch buffer for orchestration layer sync
  *
@@ -367,7 +367,7 @@ async function sendStream(call, callback) {
     let rejectedPacketCount = 0;
     const streamStartTime = Date.now();
  
-    // Extract patient_id from gRPC metadata (set by the Swift HealthKit bridge)
+    // Extract patient_id from gRPC metadata (set by the gRPC mock producer or HealthKit bridge)
     const metadataMap = call.metadata.getMap();
     const metaPatientId = metadataMap['patient-id'] || metadataMap['patient_id'] || null;
  
@@ -413,7 +413,7 @@ async function sendStream(call, callback) {
                 `LOINC=${fhirObservation.code?.coding?.[0]?.code} (${fhirObservation.code?.coding?.[0]?.display})`
             );
  
-            // ── 3. WebSocket Emit (React Native real-time feed) ────────────────
+            // ── 3. WebSocket Emit (React real-time feed) ─────────────────────
             // Payload is wellness-framed only — no clinical assertions.
             // The Compliance Auditor operates downstream on the Physician Brief,
             // but we apply the same discipline at every output boundary.

@@ -4,7 +4,7 @@
  *
  * FHIR R4 Normalization Layer
  *
- * Converts raw biometric telemetry packets (from the Swift HealthKit bridge or
+ * Converts raw biometric telemetry packets (from the gRPC telemetry gateway or
  * manual CSV input) into fully conformant HL7 FHIR R4 Observation resources,
  * LOINC-coded and UCUM-unit-annotated, ready for consumption by the LangGraph
  * orchestration layer and the Correlation Engine.

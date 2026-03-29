@@ -80,14 +80,13 @@ python -m pytest src/orchestration/tests/test_correlation.py -v    # 17 tests �
 | Frontend | React + TypeScript + Three.js | 3D visualization, SOAP brief renderer |
 | Simulation | Python + NumPy | Bergman minimal model, statin PD |
 
-## Not Yet Implemented (Roadmap)
+## Roadmap (Post-Hackathon)
 
-These features are described in the master plan but are **not in the current codebase**:
-- On-device LLM inference (MLC LLM / Llama-3 8B) — requires iOS deployment
-- Swift HealthKit bridge — requires physical iOS device; mock producer substitutes
-- Tesseract OCR pipeline — lab_parser.py handles text input; PDF OCR is Layer 2
-- FHIR R4 direct-pull from Epic/Cerner — Layer 2
-- Cloud sync, telehealth booking, Android support — Layer 2+
+- On-device inference migration (agent architecture already backend-agnostic via MCP)
+- Native mobile shell with HealthKit integration (mock_producer.js substitutes for demo)
+- Direct PDF OCR ingestion (lab_parser.py handles text; PDF parsing is next milestone)
+- FHIR R4 direct-pull from EHR systems
+- Cloud sync, telehealth booking, Android support
 
 ---
 

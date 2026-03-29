@@ -4,21 +4,19 @@ BioGuardian Embedded Vector Store
 
 On-device, zero-dependency vector store for clinical reference range
 retrieval and lab value grounding.  Implements the same functional
-contract as LanceDB (embedded, no server process, fast similarity
+contract as a production embedded vector database (no server process, fast similarity
 search) using NumPy for zero-copy vectorized operations.
 
-This store is used by The Scribe to ground ambiguous OCR-extracted lab
-values against known reference range embeddings, and by The Pharmacist
-to retrieve drug interaction context vectors.
+This store is used by The Scribe to ground ambiguous lab values against
+known reference range embeddings, and by The Pharmacist to retrieve
+drug interaction context vectors.
 
 Design decisions:
   - NumPy-only: no external DB process, works on any Python environment
   - Cosine similarity for semantic matching of lab test descriptions
   - Pre-built embeddings for the 20 most common lab panels (LOINC-coded)
   - Sub-millisecond retrieval at our reference range embedding density
-
-In production (Layer 2), this module would be backed by LanceDB with
-Apache Arrow zero-copy memory mapping for larger embedding sets.
+  - Deterministic character trigram hashing for reproducible embeddings
 """
 
 from __future__ import annotations

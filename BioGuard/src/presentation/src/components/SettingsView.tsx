@@ -52,14 +52,14 @@ const SettingsView: React.FC = () => {
         <div className="Card Settings-Card">
           <h3><Cpu size={18} /> Inference Engine</h3>
           <div className="Setting-Item">
-            <label>LLM Runtime</label>
-            <input type="text" value="MLC LLM — Llama-3 8B (4-bit GPTQ)" disabled />
-            <span className="Setting-Help">On-device inference via iOS Metal GPU. Benchmarked: 1.4s e2e.</span>
+            <label>Agent Pipeline</label>
+            <input type="text" value="Flask + LangGraph (Server-Side)" disabled />
+            <span className="Setting-Help">4-agent stateful directed graph with typed state propagation.</span>
           </div>
           <div className="Setting-Item">
             <label>Vector Store</label>
-            <input type="text" value="LanceDB (Embedded, Zero-Copy Arrow)" disabled />
-            <span className="Setting-Help">Sub-second clinical retrieval. No server process required.</span>
+            <input type="text" value="NumPy Embedded (20 LOINC Refs)" disabled />
+            <span className="Setting-Help">Cosine similarity retrieval. Zero server process. Sub-ms latency.</span>
           </div>
           <div className="Setting-Item">
             <label>Orchestration</label>

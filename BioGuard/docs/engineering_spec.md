@@ -22,7 +22,7 @@ BioGuardian is a four-layer, on-device clinical intelligence system. Every archi
 
 - **LangGraph over CrewAI**: LangGraph's stateful directed graph with conditional routing and checkpointing survives partial agent failure without corrupting downstream state. CrewAI lacks formal state management for clinical workflows.
 - **MCP over custom RPC**: Model Context Protocol provides typed tool schemas with sandboxed processes, making agents hot-swappable against their interface contracts.
-- **Embedded Vector Store**: NumPy-based cosine similarity store with 20 LOINC reference embeddings (`vector_store.py`). In Layer 2, upgrades to LanceDB with Apache Arrow zero-copy memory mapping.
+- **Embedded Vector Store** (`vector_store.py`): NumPy-based cosine similarity with 20 LOINC reference embeddings, character trigram hashing, sub-millisecond retrieval.
 - **SQLite (WAL mode)**: Thread-safe concurrent reads, zero-config persistence for telemetry and simulation history.
 
 ---

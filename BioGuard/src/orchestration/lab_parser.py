@@ -1,26 +1,22 @@
 """
-BioGuardian Lab Parser — PDF Text Extraction and LOINC Normalization
-=====================================================================
+BioGuardian Lab Parser — Text-Based LOINC Normalization
+========================================================
 
-Parses lab report text (from PDF OCR or direct text input) into typed
-LabPanel records with LOINC codes, reference ranges, and abnormality flags.
+Parses lab report text into typed LabPanel records with LOINC codes,
+reference ranges, and abnormality flags.
 
-This module implements The Scribe's core logic from master plan §4:
+Implements The Scribe's core logic: a 20-entry LOINC reference table
+with regex-based value extraction and SHA-256 source hashing.
 
-  "The Scribe takes a PDF lab report and produces LOINC-normalized JSON.
-   Layout-aware OCR handles non-standard formats; RAG retrieval grounds
-   ambiguous values against reference range embeddings stored in LanceDB."
-
-Supported formats:
-  - Quest Diagnostics CBC/CMP panels
-  - LabCorp standard format
+Supported input formats:
+  - Quest Diagnostics CBC/CMP text output
+  - LabCorp standard text format
   - Generic "Test Name: Value Unit (Ref: Low-High)" format
-  - CSV input from HealthKit export
+  - CSV input
 
-The parser uses regex-based pattern matching with a LOINC lookup table.
-In production, Tesseract 5.0 OCR with custom layout post-processing
-handles the PDF-to-text step. For the hackathon, text input is accepted
-directly.
+The parser uses regex-based pattern matching with a LOINC lookup table
+and accepts text from any source. The vector_store.py module provides
+RAG retrieval for grounding ambiguous values against reference embeddings.
 """
 
 from __future__ import annotations

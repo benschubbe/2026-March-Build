@@ -4,7 +4,7 @@
  *
  * Mock Telemetry Producer — Demo & Development Tool
  *
- * Simulates a Swift HealthKit bridge streaming all 5 supported biometric types
+ * Simulates biometric telemetry (substitutes for HealthKit bridge) streaming all 5 supported biometric types
  * to the gRPC TelemetryService. Used for:
  *   1. Local development without a physical device
  *   2. Hackathon demo — runs "Sarah's scenario" from master plan §2:
