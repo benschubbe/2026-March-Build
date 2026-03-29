@@ -62,7 +62,35 @@ const TYPE_MAP: [string, string, string, number][] = [
   ['nap time (s)', 'NAP_TIME', 'min', 1/60],
   ['nap time', 'NAP_TIME', 'min', 1],
   ['unmeasurable sleep time (s)', 'UNMEASURED_SLEEP', 'min', 1/60],
-  ['sleep score 1 day', 'SLEEP_SCORE', 'pts', 1],             // exact Garmin column name
+  // Garmin camelCase API-style column names (from developer exports / bulk export)
+  ['sleeptimeseconds', 'SLEEP_DURATION', 'min', 1/60],
+  ['sleeptimeinseconds', 'SLEEP_DURATION', 'min', 1/60],
+  ['sleeptime', 'SLEEP_DURATION', 'min', 1],
+  ['deepsleepseconds', 'DEEP_SLEEP', 'min', 1/60],
+  ['deepsleepinseconds', 'DEEP_SLEEP', 'min', 1/60],
+  ['deepsleepduration', 'DEEP_SLEEP', 'min', 1],
+  ['lightsleepseconds', 'LIGHT_SLEEP', 'min', 1/60],
+  ['lightsleepinseconds', 'LIGHT_SLEEP', 'min', 1/60],
+  ['lightsleepduration', 'LIGHT_SLEEP', 'min', 1],
+  ['remsleepseconds', 'REM_SLEEP', 'min', 1/60],
+  ['remsleepinseconds', 'REM_SLEEP', 'min', 1/60],
+  ['remsleepduration', 'REM_SLEEP', 'min', 1],
+  ['awakesleepseconds', 'AWAKE_TIME', 'min', 1/60],
+  ['awakesleepinseconds', 'AWAKE_TIME', 'min', 1/60],
+  ['unmeasurablesleepseconds', 'UNMEASURED_SLEEP', 'min', 1/60],
+  ['averagehr', 'AVG_HEART_RATE', 'bpm', 1],
+  ['averagespo2', 'SPO2', '%', 1],
+  ['lowestspo2', 'SPO2', '%', 1],
+  ['averagerespirationvalue', 'RESPIRATION_RATE', 'brpm', 1],
+  ['averagestresslevel', 'AVG_STRESS', 'pts', 1],
+  ['sleepscores', 'SLEEP_SCORE', 'pts', 1],
+  ['overallscore', 'SLEEP_SCORE', 'pts', 1],
+  ['qualityscore', 'SLEEP_SCORE', 'pts', 1],
+  ['recoveryscore', 'SLEEP_SCORE', 'pts', 1],
+  ['remscore', 'REM_SLEEP', 'min', 1],
+  ['naptimeseconds', 'NAP_TIME', 'min', 1/60],
+  ['calendardate', '_DATE', '', 1],  // date column marker
+  ['sleep score 1 day', 'SLEEP_SCORE', 'pts', 1],
   ['overall score qualifier', 'SLEEP_QUALITY', '', 1],
   ['sleep score', 'SLEEP_SCORE', 'pts', 1],
   ['sleep quality', 'SLEEP_SCORE', 'pts', 1],
@@ -130,9 +158,22 @@ const TYPE_MAP: [string, string, string, number][] = [
 ];
 
 function matchType(text: string): [string, string, number] | null {
-  const lower = text.toLowerCase().replace(/[_]/g, '').trim();
+  const lower = text.toLowerCase().trim();
+  // Try exact-ish substring match first (preserving spaces for multi-word matches)
   for (let i = 0; i < TYPE_MAP.length; i++) {
-    if (lower.includes(TYPE_MAP[i][0])) return [TYPE_MAP[i][1], TYPE_MAP[i][2], TYPE_MAP[i][3]];
+    if (lower.includes(TYPE_MAP[i][0])) {
+      if (TYPE_MAP[i][1] === '_DATE') return null; // date column, not a metric
+      return [TYPE_MAP[i][1], TYPE_MAP[i][2], TYPE_MAP[i][3]];
+    }
+  }
+  // Try again with all spaces, underscores, hyphens removed (catches camelCase after lowering)
+  const compact = lower.replace(/[\s_\-()]/g, '');
+  for (let i = 0; i < TYPE_MAP.length; i++) {
+    const compactKey = TYPE_MAP[i][0].replace(/[\s_\-()]/g, '');
+    if (compact.includes(compactKey) || compactKey.includes(compact)) {
+      if (TYPE_MAP[i][1] === '_DATE') return null;
+      return [TYPE_MAP[i][1], TYPE_MAP[i][2], TYPE_MAP[i][3]];
+    }
   }
   return null;
 }
@@ -250,17 +291,13 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ label, hint, onDataLoaded }) => {
         setDebug(dbg);
 
         if (readings.length === 0) {
-          const sampleTypes: string[] = [];
-          if (headers.indexOf('Type') >= 0 || headers.indexOf('type') >= 0) {
-            const typeCol = headers.findIndex(h => h.toLowerCase() === 'type');
-            for (let i = 0; i < Math.min(rows.length, 5); i++) {
-              if (rows[i][typeCol]) sampleTypes.push(rows[i][typeCol].substring(0, 60));
-            }
-          }
+          // Show ALL column names and sample values so the user can report the exact format
+          const allCols = headers.join(' | ');
+          const sampleRow = rows.length > 0 ? rows[0].join(' | ') : '(empty)';
           setStatus('error');
           setMessage(
-            `No readings matched. Columns: ${headers.slice(0, 6).join(', ')}` +
-            (sampleTypes.length > 0 ? `. Sample Type values: ${sampleTypes.join('; ')}` : '') +
+            `No readings matched. All ${headers.length} columns: [${allCols}]. ` +
+            `First row: [${sampleRow.substring(0, 200)}]` +
             (dbg ? `. ${dbg}` : '')
           );
           return;
