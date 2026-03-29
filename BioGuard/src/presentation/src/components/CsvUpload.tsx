@@ -22,8 +22,10 @@ interface CsvUploadProps {
 
 const TYPE_MAP: [string, string, string, number][] = [
   // [keyword (lowercased substring), internal type, unit, scale]
-  // Sleep
-  ['sleep duration (hours)', 'SLEEP_DURATION', 'min', 60],
+  // Sleep — Garmin exports use (s) for seconds, (min) for minutes, (hours)/(h) for hours
+  ['total sleep time (s)', 'SLEEP_DURATION', 'min', 1/60],   // seconds -> minutes
+  ['sleep duration (s)', 'SLEEP_DURATION', 'min', 1/60],
+  ['sleep duration (hours)', 'SLEEP_DURATION', 'min', 60],    // hours -> minutes
   ['sleep duration (h)', 'SLEEP_DURATION', 'min', 60],
   ['total sleep (hours)', 'SLEEP_DURATION', 'min', 60],
   ['sleep duration (min)', 'SLEEP_DURATION', 'min', 1],
@@ -32,25 +34,39 @@ const TYPE_MAP: [string, string, string, number][] = [
   ['total sleep', 'SLEEP_DURATION', 'min', 1],
   ['sleep analysis', 'SLEEP_DURATION', 'min', 1],
   ['sleepanalysis', 'SLEEP_DURATION', 'min', 1],
+  ['deep sleep time (s)', 'DEEP_SLEEP', 'min', 1/60],
+  ['deep sleep (s)', 'DEEP_SLEEP', 'min', 1/60],
   ['deep sleep (hours)', 'DEEP_SLEEP', 'min', 60],
   ['deep sleep (min)', 'DEEP_SLEEP', 'min', 1],
   ['deep sleep time', 'DEEP_SLEEP', 'min', 1],
   ['deep sleep', 'DEEP_SLEEP', 'min', 1],
+  ['light sleep time (s)', 'LIGHT_SLEEP', 'min', 1/60],
+  ['light sleep (s)', 'LIGHT_SLEEP', 'min', 1/60],
   ['light sleep (hours)', 'LIGHT_SLEEP', 'min', 60],
   ['light sleep (min)', 'LIGHT_SLEEP', 'min', 1],
   ['light sleep time', 'LIGHT_SLEEP', 'min', 1],
   ['light sleep', 'LIGHT_SLEEP', 'min', 1],
+  ['rem sleep time (s)', 'REM_SLEEP', 'min', 1/60],
+  ['rem sleep (s)', 'REM_SLEEP', 'min', 1/60],
   ['rem sleep (hours)', 'REM_SLEEP', 'min', 60],
   ['rem sleep (min)', 'REM_SLEEP', 'min', 1],
   ['rem sleep time', 'REM_SLEEP', 'min', 1],
   ['rem sleep', 'REM_SLEEP', 'min', 1],
+  ['awake sleep time (s)', 'AWAKE_TIME', 'min', 1/60],
+  ['awake time (s)', 'AWAKE_TIME', 'min', 1/60],
   ['awake (hours)', 'AWAKE_TIME', 'min', 60],
   ['awake (min)', 'AWAKE_TIME', 'min', 1],
   ['awake duration', 'AWAKE_TIME', 'min', 1],
   ['awake time', 'AWAKE_TIME', 'min', 1],
   ['awake', 'AWAKE_TIME', 'min', 1],
+  ['nap time (s)', 'NAP_TIME', 'min', 1/60],
+  ['nap time', 'NAP_TIME', 'min', 1],
+  ['unmeasurable sleep time (s)', 'UNMEASURED_SLEEP', 'min', 1/60],
+  ['sleep score 1 day', 'SLEEP_SCORE', 'pts', 1],             // exact Garmin column name
+  ['overall score qualifier', 'SLEEP_QUALITY', '', 1],
   ['sleep score', 'SLEEP_SCORE', 'pts', 1],
   ['sleep quality', 'SLEEP_SCORE', 'pts', 1],
+  ['score qualifier', 'SLEEP_QUALITY', '', 1],
   // Heart
   ['heartratevariability', 'HRV_RMSSD', 'ms', 1],
   ['heart rate variability', 'HRV_RMSSD', 'ms', 1],
@@ -198,7 +214,7 @@ function parseUniversal(rows: string[][], headers: string[]): { readings: Biomet
     const ts = dateIdx >= 0 && row[dateIdx] ? row[dateIdx] : new Date().toISOString();
     for (let m = 0; m < mappedCols.length; m++) {
       const raw = parseFloat(row[mappedCols[m]]);
-      if (isNaN(raw) || raw === 0) continue;
+      if (isNaN(raw)) continue;
       readings.push({
         timestamp: ts, type: mappedInfo[m][0],
         value: raw * mappedInfo[m][2], unit: mappedInfo[m][1], source: 'Import',

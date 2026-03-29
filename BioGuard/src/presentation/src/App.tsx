@@ -24,6 +24,8 @@ const METRICS: MetricDef[] = [
   { type: 'REM_SLEEP', label: 'REM Sleep', unit: 'min', icon: 'moon', normLow: 60, normHigh: 120, color: '#8b5cf6', category: 'sleep' },
   { type: 'LIGHT_SLEEP', label: 'Light Sleep', unit: 'min', icon: 'moon', normLow: 180, normHigh: 300, color: '#c4b5fd', category: 'sleep' },
   { type: 'SLEEP_SCORE', label: 'Sleep Score', unit: 'pts', icon: 'moon', normLow: 60, normHigh: 100, color: '#ddd6fe', category: 'sleep' },
+  { type: 'NAP_TIME', label: 'Nap Time', unit: 'min', icon: 'moon', normLow: 0, normHigh: 30, color: '#e9d5ff', category: 'sleep' },
+  { type: 'AWAKE_TIME', label: 'Awake Time', unit: 'min', icon: 'moon', normLow: 0, normHigh: 60, color: '#fecaca', category: 'sleep' },
   { type: 'STEP_COUNT', label: 'Daily Steps', unit: 'steps', icon: 'steps', normLow: 7000, normHigh: 12000, color: '#34d399', category: 'activity' },
   { type: 'DISTANCE', label: 'Distance', unit: 'km', icon: 'steps', normLow: 4, normHigh: 10, color: '#6ee7b7', category: 'activity' },
   { type: 'CALORIES_BURNED', label: 'Calories Burned', unit: 'kcal', icon: 'flame', normLow: 1800, normHigh: 3000, color: '#fb923c', category: 'activity' },
