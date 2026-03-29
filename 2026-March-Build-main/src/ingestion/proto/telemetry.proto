@@ -1,21 +1,210 @@
+// =============================================================================
+// BioGuardian — Clinical Intelligence Infrastructure
+// src/ingestion/proto/telemetry.proto
+//
+// Telemetry Service Protocol Definition — HL7 FHIR R4 / LOINC aligned
+//
+// Defines the gRPC contract between:
+//   CLIENT  — Swift HealthKit bridge (iOS) or mock_producer.js (dev/demo)
+//   SERVER  — src/ingestion/server.js (TelemetryService gRPC handler)
+//
+// Design contracts (master plan §4):
+//   - Field names use snake_case throughout to match the JS/Python layer
+//     conventions and the Pydantic BiometricStream schema.
+//   - The `type` field carries canonical biometric type strings that map
+//     directly to LOINC codes in normalizer.js. Valid values are the closed
+//     set defined in SUPPORTED_BIOMETRIC_TYPES (server.js):
+//       HRV_RMSSD | SLEEP_ANALYSIS | BLOOD_GLUCOSE | STEP_COUNT | RESTING_HEART_RATE
+//   - Timestamps are ISO-8601 strings, not epoch integers. This eliminates
+//     the epoch-ms vs epoch-s ambiguity that normalizeTimestamp() works
+//     around in normalizer.js. The Swift bridge formats via ISO8601DateFormatter.
+//   - StreamSummary mirrors the JS object returned by the sendStream callback
+//     so the mock_producer.js response handler can log all fields without
+//     type coercion.
+//   - The RPC name is `sendStream` (camelCase) per proto3 convention.
+//     grpc-js generates client stubs as camelCase method names; PascalCase
+//     would generate `SendStream` on the stub — which does NOT match the
+//     service definition name and causes silent method-not-found errors
+//     in some gRPC implementations.
+//
+// Privacy architecture (master plan §4):
+//   - No PHI is transmitted beyond patient_id (a pseudonymous reference).
+//   - Raw sensor values only. Clinical interpretation happens on-device in
+//     the LangGraph orchestration layer, never in transit.
+//   - This proto is the wire format only — FHIR normalization occurs
+//     server-side in normalizer.js after receipt.
+//
+// Versioning:
+//   - schema_version field on TelemetryPacket allows the server to reject
+//     packets from outdated client versions without breaking the stream.
+//   - Increment MINOR for new optional fields (backward compatible).
+//   - Increment MAJOR and create a new package namespace for breaking changes.
+//
+// Compilation (if generating stubs for other languages):
+//   protoc --js_out=import_style=commonjs,binary:. \
+//          --grpc_out=grpc_js:. \
+//          --plugin=protoc-gen-grpc=`which grpc_tools_node_protoc_plugin` \
+//          proto/telemetry.proto
+//
+// grpc-js (Node.js) loads this file directly via @grpc/proto-loader —
+// no compilation step required for the JS ingestion layer.
+//
+// Proto3 spec: https://protobuf.dev/programming-guides/proto3/
+// =============================================================================
+
 syntax = "proto3";
 
 package telemetry;
 
+option java_package         = "io.bioguardian.telemetry";
+option java_outer_classname = "TelemetryProto";
+option objc_class_prefix    = "BGT";
+
+// =============================================================================
+// TelemetryService
+//
+// Single RPC: sendStream
+//   Client opens a client-streaming RPC and sends TelemetryPacket messages
+//   continuously. The server accumulates, normalizes, and forwards them to
+//   the LangGraph orchestration layer. When the client calls `call.end()`,
+//   the server returns a StreamSummary with ingestion statistics.
+//
+// gRPC metadata (set by Swift bridge / mock_producer.js):
+//   patient-id  — pseudonymous patient identifier (mirrors TelemetryPacket.patient_id)
+//   demo-mode   — "ade" | "baseline" | "stress" (dev/demo only, ignored in production)
+// =============================================================================
+
 service TelemetryService {
-  rpc SendStream (stream TelemetryData) returns (TelemetryResponse) {}
+
+  // Client-streaming RPC: client sends a stream of biometric observations,
+  // server returns a single StreamSummary when the stream ends.
+  //
+  // Used by:
+  //   - Swift HealthKit bridge (HKObserverQuery background delivery)
+  //   - mock_producer.js (development and demo)
+  //
+  // Error codes:
+  //   INVALID_ARGUMENT  — packet failed BiometricStream schema validation
+  //   UNAVAILABLE       — orchestration layer unreachable (offline-first: stream continues)
+  //   INTERNAL          — unexpected server error
+  rpc sendStream (stream TelemetryPacket) returns (StreamSummary) {}
+
 }
 
-message TelemetryData {
+// =============================================================================
+// TelemetryPacket
+//
+// A single biometric observation from a HealthKit data source.
+// Wire format for the BiometricStream Pydantic schema (agents/schemas.py).
+//
+// Required fields (server rejects packets missing these):
+//   patient_id, type, value, source
+//
+// Optional fields:
+//   unit      — informational only; authoritative UCUM codes are assigned
+//               server-side from the LOINC map in normalizer.js
+//   timestamp — ISO-8601 UTC preferred; server falls back to ingestion time
+//               if absent or unparseable
+// =============================================================================
+
+message TelemetryPacket {
+
+  // Pseudonymous patient identifier.
+  // Format: "PT-{YEAR}-{IDENTIFIER}" e.g. "PT-2026-SARAH"
+  // Maps to FHIR R4 Patient.id and subject.reference in the normalized Observation.
+  // Required. Stream packets with empty patient_id are rejected.
   string patient_id = 1;
-  string source = 2; // e.g., "Oura", "CGM", "AppleWatch"
-  string type = 3;   // e.g., "glucose", "heart_rate", "sleep"
+
+  // Device or data source identifier.
+  // Examples: "AppleWatch_S9", "MockHealthKit-AppleWatch-S9", "ManualCSV"
+  // Stored in FHIR Observation.device.display and the audit chain.
+  // Required.
+  string source = 2;
+
+  // Canonical biometric type. Must be one of the closed set:
+  //   HRV_RMSSD          — Heart rate variability (RMSSD method) → LOINC 80404-7
+  //   RESTING_HEART_RATE — Resting heart rate                    → LOINC 40443-4
+  //   BLOOD_GLUCOSE      — Fasting capillary glucose             → LOINC 2339-0
+  //   SLEEP_ANALYSIS     — Total sleep duration                  → LOINC 93832-4
+  //   STEP_COUNT         — Daily step count                      → LOINC 55423-8
+  //
+  // Case-insensitive on the server (normalizer.js calls .toUpperCase()).
+  // Unknown types produce an error-state FHIR Observation (status: "unknown")
+  // that is logged to the audit chain but never surfaced in a Physician Brief.
+  // Required.
+  string type = 3;
+
+  // Observed numeric value in the unit indicated by `unit`.
+  // Must be finite (NaN and Infinity are rejected).
+  // Clinical ranges by type (server does not range-check — Correlation Engine does):
+  //   HRV_RMSSD:          12–80  ms
+  //   RESTING_HEART_RATE: 40–110 bpm
+  //   BLOOD_GLUCOSE:      60–400 mg/dL
+  //   SLEEP_ANALYSIS:     0–900  min
+  //   STEP_COUNT:         0–50000 steps
+  // Required.
   double value = 4;
+
+  // Human-readable unit label from the source device.
+  // Examples: "mg/dL", "ms", "bpm", "min", "steps"
+  // Informational only — authoritative UCUM codes are assigned from the
+  // LOINC map server-side. Not used for any clinical computation.
+  // Optional.
   string unit = 5;
-  int64 timestamp = 6;
+
+  // Observation timestamp in ISO-8601 UTC format.
+  // Example: "2026-03-29T14:00:00.000Z"
+  // Changed from int64 (epoch) to string to eliminate the epoch-ms vs
+  // epoch-s ambiguity. The Swift bridge formats via ISO8601DateFormatter.
+  // normalizeTimestamp() in normalizer.js handles all formats as fallback
+  // for legacy clients.
+  // Optional — server falls back to ingestion time if absent.
+  string timestamp = 6;
+
+  // Schema version for forward compatibility.
+  // Allows the server to reject packets from outdated client builds.
+  // Format: "MAJOR.MINOR.PATCH" — e.g. "1.0.0"
+  // Optional — server accepts packets without this field (treats as "1.0.0").
+  string schema_version = 7;
+
 }
 
-message TelemetryResponse {
+// =============================================================================
+// StreamSummary
+//
+// Returned by sendStream when the client closes the stream (call.end()).
+// Mirrors the JS summary object built in server.js sendStream handler.
+//
+// All count fields default to 0 (proto3 default for int32).
+// The stream_id ties this summary to the corresponding audit chain entries.
+// =============================================================================
+
+message StreamSummary {
+
+  // Whether the stream was processed without a fatal server error.
+  // true  — stream ended cleanly; see packets_rejected for soft failures
+  // false — stream encountered an unrecoverable error
   bool success = 1;
+
+  // Human-readable summary for logging.
+  // Example: "Ingested 48/50 telemetry packets in 62340ms."
   string message = 2;
+
+  // Unique identifier for this stream, generated by the server.
+  // Format: UUID v4. Used to correlate StreamSummary with audit chain entries.
+  string stream_id = 3;
+
+  // Total packets received by the server (valid + rejected).
+  int32 packets_received = 4;
+
+  // Packets that passed BiometricStream schema validation and were normalized.
+  int32 packets_valid = 5;
+
+  // Packets that failed schema validation and were dropped.
+  // Rejection reasons are logged to the audit chain with PACKET_VALIDATION_FAILED events.
+  int32 packets_rejected = 6;
+
+  // Wall-clock duration of the stream in milliseconds.
+  int64 duration_ms = 7;
+
 }
