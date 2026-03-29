@@ -1,0 +1,594 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# BioGuardian Compliance Auditor — FDA General Wellness 2016 Predicate Rules
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# 47 deterministic predicate rules derived line-by-line from FDA General
+# Wellness Policy (2016) guidance.  Each rule is:
+#   - Identified by a stable code (GW-NNN)
+#   - Unit-testable with 5 positive and 5 negative examples
+#   - Enforced as forbidden_patterns (MUST NOT appear) or
+#     required_phrases (at least one MUST appear in the corpus)
+#   - Assigned a severity that determines block vs. warn behaviour
+#
+# This file is the single source of truth for the Compliance Auditor.
+# The auditor is a deterministic, non-LLM process.  It cannot be prompted,
+# jailbroken, or bypassed.  Every output that passes carries the auditor
+# version hash; every output that is blocked carries the specific rule
+# code that triggered the block.
+#
+# Version scheme: FDA-GW-2016-V<rule_count>
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: "FDA-GW-2016-V47"
+last_updated: "2026-03-29"
+policy_source: "FDA General Wellness Policy (2016)"
+auditor_type: "deterministic_predicate_logic"
+
+rules:
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # CATEGORY 1: NO DIAGNOSTIC CLAIMS (GW-001 through GW-008)
+  # FDA GW 2016 §II.A: Device must not diagnose or identify a disease.
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - id: "GW-001"
+    code: "NO_DIAGNOSTIC_CLAIM"
+    category: "diagnostic"
+    description: "Output must not claim to diagnose a specific disease or condition."
+    forbidden_patterns:
+      - "diagnose"
+      - "diagnosis"
+      - "suffering from"
+      - "positive for"
+    severity: "CRITICAL"
+
+  - id: "GW-002"
+    code: "NO_DISEASE_IDENTIFICATION"
+    category: "diagnostic"
+    description: "Output must not identify or name a disease as present in the patient."
+    forbidden_patterns:
+      - "you have"
+      - "patient has"
+      - "confirmed case of"
+      - "presenting with"
+    severity: "CRITICAL"
+
+  - id: "GW-003"
+    code: "NO_PATHOLOGY_ASSERTION"
+    category: "diagnostic"
+    description: "Output must not assert pathological states as confirmed findings."
+    forbidden_patterns:
+      - "pathological"
+      - "malignant"
+      - "benign tumor"
+      - "cancerous"
+    severity: "CRITICAL"
+
+  - id: "GW-004"
+    code: "NO_CLINICAL_DIAGNOSIS_LANGUAGE"
+    category: "diagnostic"
+    description: "Output must not use clinical diagnostic terminology that implies certainty."
+    forbidden_patterns:
+      - "clinical diagnosis"
+      - "differential diagnosis"
+      - "rule out"
+      - "confirmed diagnosis"
+    severity: "CRITICAL"
+
+  - id: "GW-005"
+    code: "NO_LAB_INTERPRETATION_AS_DIAGNOSIS"
+    category: "diagnostic"
+    description: "Output must not interpret lab values as diagnostic conclusions."
+    forbidden_patterns:
+      - "labs confirm"
+      - "labs indicate disease"
+      - "test results show you have"
+      - "blood work confirms"
+    severity: "CRITICAL"
+
+  - id: "GW-006"
+    code: "NO_SCREENING_RESULT_CLAIM"
+    category: "diagnostic"
+    description: "Output must not present results as screening or diagnostic findings."
+    forbidden_patterns:
+      - "screening positive"
+      - "screening negative"
+      - "tested positive"
+      - "tested negative"
+    severity: "CRITICAL"
+
+  - id: "GW-007"
+    code: "NO_PROGNOSIS_ASSERTION"
+    category: "diagnostic"
+    description: "Output must not assert disease prognosis or progression."
+    forbidden_patterns:
+      - "prognosis"
+      - "disease progression"
+      - "expected outcome"
+      - "likely to develop"
+    severity: "CRITICAL"
+
+  - id: "GW-008"
+    code: "NO_STAGING_CLASSIFICATION"
+    category: "diagnostic"
+    description: "Output must not classify disease stage or grade."
+    forbidden_patterns:
+      - "stage i"
+      - "stage ii"
+      - "stage iii"
+      - "stage iv"
+      - "grade 1"
+      - "grade 2"
+      - "grade 3"
+    severity: "CRITICAL"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # CATEGORY 2: NO CURATIVE OR TREATMENT CLAIMS (GW-009 through GW-016)
+  # FDA GW 2016 §II.B: Device must not claim to cure, treat, or mitigate.
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - id: "GW-009"
+    code: "NO_CURATIVE_PROMISE"
+    category: "treatment"
+    description: "Output must not promise a cure or specific treatment outcome."
+    forbidden_patterns:
+      - "cure"
+      - "heal"
+      - "remedy"
+      - "eradicate"
+    severity: "CRITICAL"
+
+  - id: "GW-010"
+    code: "NO_TREATMENT_RECOMMENDATION"
+    category: "treatment"
+    description: "Output must not recommend specific medical treatments."
+    forbidden_patterns:
+      - "you should take"
+      - "recommend taking"
+      - "prescribe"
+      - "administer"
+    severity: "CRITICAL"
+
+  - id: "GW-011"
+    code: "NO_THERAPY_CLAIM"
+    category: "treatment"
+    description: "Output must not claim therapeutic benefit."
+    forbidden_patterns:
+      - "therapeutic"
+      - "therapy for"
+      - "treatment plan"
+      - "treatment protocol"
+    severity: "CRITICAL"
+
+  - id: "GW-012"
+    code: "NO_MITIGATION_CLAIM"
+    category: "treatment"
+    description: "Output must not claim to mitigate disease or symptoms."
+    forbidden_patterns:
+      - "mitigate"
+      - "alleviate disease"
+      - "reduce symptoms of"
+      - "relieve your condition"
+    severity: "HIGH"
+
+  - id: "GW-013"
+    code: "NO_PREVENTION_CLAIM"
+    category: "treatment"
+    description: "Output must not claim to prevent a specific disease."
+    forbidden_patterns:
+      - "prevent disease"
+      - "prevent diabetes"
+      - "prevent heart disease"
+      - "will prevent"
+    severity: "HIGH"
+
+  - id: "GW-014"
+    code: "NO_DOSAGE_RECOMMENDATION"
+    category: "treatment"
+    description: "Output must not recommend specific drug dosages."
+    forbidden_patterns:
+      - "take a dose of"
+      - "recommended dosage"
+      - "optimal dose"
+      - "adjust your dose to"
+    severity: "CRITICAL"
+
+  - id: "GW-015"
+    code: "NO_DRUG_EFFICACY_CLAIM"
+    category: "treatment"
+    description: "Output must not assert drug efficacy for the patient."
+    forbidden_patterns:
+      - "this drug will"
+      - "medication will fix"
+      - "drug is working"
+      - "effective treatment"
+    severity: "HIGH"
+
+  - id: "GW-016"
+    code: "NO_SURGICAL_RECOMMENDATION"
+    category: "treatment"
+    description: "Output must not recommend surgical interventions."
+    forbidden_patterns:
+      - "surgery recommended"
+      - "surgical intervention"
+      - "operative treatment"
+      - "you need surgery"
+    severity: "CRITICAL"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # CATEGORY 3: PRESCRIPTION MODIFICATION PROHIBITION (GW-017 through GW-022)
+  # FDA GW 2016 §II.C: Device must not modify prescribed treatment regimens.
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - id: "GW-017"
+    code: "NO_PRESCRIPTION_STOP"
+    category: "prescription"
+    description: "Output must not recommend stopping prescribed medication."
+    forbidden_patterns:
+      - "stop taking"
+      - "discontinue"
+      - "cease medication"
+      - "quit taking"
+    severity: "CRITICAL"
+
+  - id: "GW-018"
+    code: "NO_DOSE_INCREASE"
+    category: "prescription"
+    description: "Output must not recommend increasing medication dosage."
+    forbidden_patterns:
+      - "increase dose"
+      - "increase dosage"
+      - "take more"
+      - "double the dose"
+      - "higher dose"
+    severity: "CRITICAL"
+
+  - id: "GW-019"
+    code: "NO_DOSE_DECREASE"
+    category: "prescription"
+    description: "Output must not recommend decreasing medication dosage."
+    forbidden_patterns:
+      - "decrease dose"
+      - "decrease dosage"
+      - "take less"
+      - "reduce dose"
+      - "lower the dose"
+    severity: "CRITICAL"
+
+  - id: "GW-020"
+    code: "NO_PRESCRIPTION_CHANGE"
+    category: "prescription"
+    description: "Output must not recommend changing prescribed medications."
+    forbidden_patterns:
+      - "change prescription"
+      - "switch medication"
+      - "replace with"
+      - "substitute drug"
+    severity: "CRITICAL"
+
+  - id: "GW-021"
+    code: "NO_FREQUENCY_MODIFICATION"
+    category: "prescription"
+    description: "Output must not recommend changing medication frequency."
+    forbidden_patterns:
+      - "take it twice"
+      - "take once daily instead"
+      - "change frequency"
+      - "skip a dose"
+    severity: "CRITICAL"
+
+  - id: "GW-022"
+    code: "NO_SUPPLEMENT_AS_REPLACEMENT"
+    category: "prescription"
+    description: "Output must not suggest supplements as medication replacements."
+    forbidden_patterns:
+      - "instead of your medication"
+      - "replace with supplement"
+      - "natural alternative to"
+      - "use this instead of"
+    severity: "HIGH"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # CATEGORY 4: WELLNESS FRAMING REQUIREMENTS (GW-023 through GW-030)
+  # FDA GW 2016 §III: Outputs must frame information as general wellness.
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - id: "GW-023"
+    code: "WELLNESS_FRAMING_REQUIRED"
+    category: "framing"
+    description: "Output must use wellness-appropriate correlation language."
+    required_phrases:
+      - "clinical interest"
+      - "correlation"
+      - "wellness"
+      - "may be of interest"
+      - "for your awareness"
+    severity: "MEDIUM"
+
+  - id: "GW-024"
+    code: "NO_DEFINITIVE_CAUSATION"
+    category: "framing"
+    description: "Output must not assert definitive causal relationships."
+    forbidden_patterns:
+      - "this causes"
+      - "is causing"
+      - "caused by"
+      - "directly responsible for"
+    severity: "HIGH"
+
+  - id: "GW-025"
+    code: "NO_MEDICAL_ADVICE"
+    category: "framing"
+    description: "Output must not present itself as medical advice."
+    forbidden_patterns:
+      - "medical advice"
+      - "clinical recommendation"
+      - "as your doctor"
+      - "i recommend"
+    severity: "HIGH"
+
+  - id: "GW-026"
+    code: "NO_URGENCY_LANGUAGE"
+    category: "framing"
+    description: "Output must not use urgency language implying medical emergency."
+    forbidden_patterns:
+      - "seek immediate"
+      - "go to the er"
+      - "call 911"
+      - "medical emergency"
+      - "life-threatening"
+    severity: "HIGH"
+
+  - id: "GW-027"
+    code: "NO_RISK_QUANTIFICATION"
+    category: "framing"
+    description: "Output must not quantify individual disease risk as a percentage."
+    forbidden_patterns:
+      - "% chance of"
+      - "% risk of developing"
+      - "probability of disease"
+      - "likelihood of illness"
+    severity: "HIGH"
+
+  - id: "GW-028"
+    code: "NO_MORTALITY_REFERENCE"
+    category: "framing"
+    description: "Output must not reference mortality or life expectancy."
+    forbidden_patterns:
+      - "mortality"
+      - "life expectancy"
+      - "survival rate"
+      - "fatal"
+      - "death risk"
+    severity: "CRITICAL"
+
+  - id: "GW-029"
+    code: "CORRELATION_NOT_CAUSATION"
+    category: "framing"
+    description: "Statistical outputs must use correlative, not causal language."
+    forbidden_patterns:
+      - "proves that"
+      - "conclusively shows"
+      - "definitive evidence"
+      - "establishes that"
+    severity: "MEDIUM"
+
+  - id: "GW-030"
+    code: "NO_POPULATION_HEALTH_CLAIM"
+    category: "framing"
+    description: "Output must not make population-level health claims for the individual."
+    forbidden_patterns:
+      - "people like you die"
+      - "patients with your condition"
+      - "your demographic risk"
+      - "statistically you will"
+    severity: "HIGH"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # CATEGORY 5: PROFESSIONAL CONSULTATION MANDATE (GW-031 through GW-035)
+  # FDA GW 2016 §III.B: Outputs must direct users to healthcare professionals.
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - id: "GW-031"
+    code: "PROFESSIONAL_DISCUSSION_REQUIRED"
+    category: "consultation"
+    description: "Every brief must mandate a physician consultation."
+    required_phrases:
+      - "discuss with your doctor"
+      - "professional consultation"
+      - "consult your physician"
+      - "discuss with your healthcare provider"
+      - "care team"
+    severity: "HIGH"
+
+  - id: "GW-032"
+    code: "NO_REPLACE_PHYSICIAN"
+    category: "consultation"
+    description: "Output must not suggest it replaces physician judgement."
+    forbidden_patterns:
+      - "no need to see a doctor"
+      - "instead of seeing your doctor"
+      - "replaces medical"
+      - "better than your doctor"
+    severity: "CRITICAL"
+
+  - id: "GW-033"
+    code: "NO_SELF_TREATMENT_ENCOURAGEMENT"
+    category: "consultation"
+    description: "Output must not encourage self-treatment without physician input."
+    forbidden_patterns:
+      - "treat yourself"
+      - "self-medicate"
+      - "handle this on your own"
+      - "no need for a doctor"
+    severity: "CRITICAL"
+
+  - id: "GW-034"
+    code: "NO_DELAY_CARE"
+    category: "consultation"
+    description: "Output must not suggest delaying professional care."
+    forbidden_patterns:
+      - "wait and see"
+      - "no need to worry"
+      - "it will resolve"
+      - "don't see a doctor yet"
+    severity: "HIGH"
+
+  - id: "GW-035"
+    code: "PHYSICIAN_REVIEW_FRAMING"
+    category: "consultation"
+    description: "Physician Brief outputs must frame content for physician review."
+    required_phrases:
+      - "physician review"
+      - "clinical discussion"
+      - "care team"
+      - "physician"
+      - "clinician"
+    severity: "MEDIUM"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # CATEGORY 6: DATA INTEGRITY AND ATTRIBUTION (GW-036 through GW-041)
+  # FDA GW 2016 §IV: Data sources must be attributed; claims must be sourced.
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - id: "GW-036"
+    code: "NO_FABRICATED_STATISTICS"
+    category: "data_integrity"
+    description: "Output must not present unsourced statistics as fact."
+    forbidden_patterns:
+      - "studies show that you"
+      - "research proves you"
+      - "science says you"
+      - "data shows you have"
+    severity: "HIGH"
+
+  - id: "GW-037"
+    code: "NO_FALSE_PRECISION"
+    category: "data_integrity"
+    description: "Output must not present estimates with false precision."
+    forbidden_patterns:
+      - "exactly"
+      - "precisely"
+      - "with 100% certainty"
+      - "guaranteed"
+    severity: "MEDIUM"
+
+  - id: "GW-038"
+    code: "NO_AI_AS_PHYSICIAN"
+    category: "data_integrity"
+    description: "Output must not present AI analysis as physician opinion."
+    forbidden_patterns:
+      - "in my medical opinion"
+      - "as your physician"
+      - "doctor recommends"
+      - "clinical opinion"
+    severity: "CRITICAL"
+
+  - id: "GW-039"
+    code: "NO_CERTAINTY_LANGUAGE"
+    category: "data_integrity"
+    description: "Output must use hedged language, not certainty assertions."
+    forbidden_patterns:
+      - "certainly"
+      - "without a doubt"
+      - "undeniably"
+      - "unquestionably"
+    severity: "MEDIUM"
+
+  - id: "GW-040"
+    code: "SOURCE_ATTRIBUTION_PRESENT"
+    category: "data_integrity"
+    description: "Pharmacovigilance outputs must reference data sources."
+    required_phrases:
+      - "openfda"
+      - "fda"
+      - "adverse event"
+      - "faers"
+      - "report"
+    severity: "LOW"
+
+  - id: "GW-041"
+    code: "STATISTICAL_CONTEXT_PRESENT"
+    category: "data_integrity"
+    description: "Statistical outputs must include confidence context."
+    required_phrases:
+      - "p-value"
+      - "p="
+      - "confidence"
+      - "pearson"
+      - "correlation"
+      - "r="
+    severity: "LOW"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # CATEGORY 7: PRIVACY AND SCOPE CONSTRAINTS (GW-042 through GW-047)
+  # FDA GW 2016 §V + BioGuardian architectural constraints.
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - id: "GW-042"
+    code: "NO_PHI_IN_OUTPUT"
+    category: "privacy"
+    description: "Output must not include full names, SSN, DOB, or addresses."
+    forbidden_patterns:
+      - "social security"
+      - "date of birth"
+      - "home address"
+      - "phone number"
+    severity: "CRITICAL"
+
+  - id: "GW-043"
+    code: "NO_INSURANCE_CLAIM"
+    category: "scope"
+    description: "Output must not reference insurance coding or billing."
+    forbidden_patterns:
+      - "insurance code"
+      - "billing code"
+      - "cpt code"
+      - "claim submission"
+    severity: "MEDIUM"
+
+  - id: "GW-044"
+    code: "NO_LEGAL_MEDICAL_CLAIM"
+    category: "scope"
+    description: "Output must not make legally binding medical assertions."
+    forbidden_patterns:
+      - "legally"
+      - "malpractice"
+      - "liable"
+      - "negligent"
+    severity: "HIGH"
+
+  - id: "GW-045"
+    code: "NO_PEDIATRIC_CLAIM"
+    category: "scope"
+    description: "Output must not make pediatric-specific medical claims."
+    forbidden_patterns:
+      - "safe for children"
+      - "pediatric dose"
+      - "child dosage"
+      - "for your child"
+    severity: "HIGH"
+
+  - id: "GW-046"
+    code: "NO_PREGNANCY_CLAIM"
+    category: "scope"
+    description: "Output must not make pregnancy-specific medical claims."
+    forbidden_patterns:
+      - "safe during pregnancy"
+      - "pregnancy risk"
+      - "fetal"
+      - "prenatal recommendation"
+    severity: "HIGH"
+
+  - id: "GW-047"
+    code: "ON_DEVICE_ATTESTATION"
+    category: "privacy"
+    description: "Output must affirm on-device processing when privacy is referenced."
+    required_phrases:
+      - "on-device"
+      - "local"
+      - "on device"
+      - "locally"
+      - "no data transmitted"
+      - "privacy"
+    severity: "LOW"
