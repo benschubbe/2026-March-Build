@@ -153,15 +153,24 @@ function parseGarminStyle(rows: string[][], headers: string[]): BiometricReading
   const lower = headers.map(h => h.toLowerCase().trim());
   const dateIdx = lower.findIndex(h => h.includes('date') || h.includes('time') || h === 'day');
 
-  // Build column index -> [type, unit, scale] mapping
-  const colMap: Map<number, [string, string, number]> = new Map();
+  // Build column index -> [type, unit, scale] mapping as parallel arrays
+  const mappedCols: number[] = [];
+  const mappedTypes: string[] = [];
+  const mappedUnits: string[] = [];
+  const mappedScales: number[] = [];
+
   for (let i = 0; i < lower.length; i++) {
     const exact = COLUMN_MAP[lower[i]];
-    if (exact) { colMap.set(i, exact); continue; }
+    if (exact) {
+      mappedCols.push(i); mappedTypes.push(exact[0]); mappedUnits.push(exact[1]); mappedScales.push(exact[2]);
+      continue;
+    }
     // Fuzzy: check if any key is a substring of the header or vice versa
-    for (const [key, val] of Object.entries(COLUMN_MAP)) {
-      if (lower[i].includes(key) || key.includes(lower[i])) {
-        colMap.set(i, val);
+    const keys = Object.keys(COLUMN_MAP);
+    for (let k = 0; k < keys.length; k++) {
+      if (lower[i].includes(keys[k]) || keys[k].includes(lower[i])) {
+        const val = COLUMN_MAP[keys[k]];
+        mappedCols.push(i); mappedTypes.push(val[0]); mappedUnits.push(val[1]); mappedScales.push(val[2]);
         break;
       }
     }
@@ -170,10 +179,10 @@ function parseGarminStyle(rows: string[][], headers: string[]): BiometricReading
   const readings: BiometricReading[] = [];
   for (const row of rows) {
     const ts = dateIdx >= 0 && row[dateIdx] ? row[dateIdx] : new Date().toISOString();
-    for (const [col, [type, unit, scale]] of colMap.entries()) {
-      const raw = parseFloat(row[col]);
+    for (let m = 0; m < mappedCols.length; m++) {
+      const raw = parseFloat(row[mappedCols[m]]);
       if (isNaN(raw) || raw === 0) continue;
-      readings.push({ timestamp: ts, type, value: raw * scale, unit, source: 'Garmin Connect' });
+      readings.push({ timestamp: ts, type: mappedTypes[m], value: raw * mappedScales[m], unit: mappedUnits[m], source: 'Garmin Connect' });
     }
   }
   return readings;
@@ -258,10 +267,11 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onDataLoaded }) => {
           return;
         }
 
-        const types = new Set(readings.map(r => r.type));
+        const typeArr = readings.map(r => r.type);
+        const uniqueTypes = typeArr.filter((t, i) => typeArr.indexOf(t) === i);
         setPreview(readings.slice(0, 10));
         setStatus('loaded');
-        setMessage(`${readings.length} readings | ${types.size} metrics: ${[...types].join(', ')}`);
+        setMessage(`${readings.length} readings | ${uniqueTypes.length} metrics: ${uniqueTypes.join(', ')}`);
         onDataLoaded(readings);
       } catch (err) {
         setStatus('error');
