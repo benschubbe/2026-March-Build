@@ -22,7 +22,24 @@ interface CsvUploadProps {
 
 const TYPE_MAP: [string, string, string, number][] = [
   // [keyword (lowercased substring), internal type, unit, scale]
-  // Sleep — Garmin exports use (s) for seconds, (min) for minutes, (hours)/(h) for hours
+  //
+  // ORDER MATTERS: longer/more-specific patterns must come FIRST because
+  // matchType() returns the first substring match.  "sleep score" must
+  // come before "sleep" to prevent scores matching duration entries.
+
+  // Sleep SCORES first (prevent score values getting duration scaling)
+  ['sleep score 1 day', 'SLEEP_SCORE', 'pts', 1],
+  ['sleepscorequalifier', 'SLEEP_QUALITY', '', 1],
+  ['sleepscore', 'SLEEP_SCORE', 'pts', 1],
+  ['sleep score', 'SLEEP_SCORE', 'pts', 1],
+  ['sleep quality', 'SLEEP_SCORE', 'pts', 1],
+  ['overall score qualifier', 'SLEEP_QUALITY', '', 1],
+  ['overallscore', 'SLEEP_SCORE', 'pts', 1],
+  ['qualityscore', 'SLEEP_SCORE', 'pts', 1],
+  ['recoveryscore', 'SLEEP_SCORE', 'pts', 1],
+  ['score qualifier', 'SLEEP_QUALITY', '', 1],
+
+  // Sleep DURATIONS — Garmin uses (s) for seconds, (min) for minutes, (hours)/(h) for hours
   ['total sleep time (s)', 'SLEEP_DURATION', 'min', 1/60],   // seconds -> minutes
   ['sleep duration (s)', 'SLEEP_DURATION', 'min', 1/60],
   ['sleep duration (hours)', 'SLEEP_DURATION', 'min', 60],    // hours -> minutes
@@ -90,11 +107,6 @@ const TYPE_MAP: [string, string, string, number][] = [
   ['remscore', 'REM_SLEEP', 'min', 1],
   ['naptimeseconds', 'NAP_TIME', 'min', 1/60],
   ['calendardate', '_DATE', '', 1],  // date column marker
-  ['sleep score 1 day', 'SLEEP_SCORE', 'pts', 1],
-  ['overall score qualifier', 'SLEEP_QUALITY', '', 1],
-  ['sleep score', 'SLEEP_SCORE', 'pts', 1],
-  ['sleep quality', 'SLEEP_SCORE', 'pts', 1],
-  ['score qualifier', 'SLEEP_QUALITY', '', 1],
   // Heart
   ['heartratevariability', 'HRV_RMSSD', 'ms', 1],
   ['heart rate variability', 'HRV_RMSSD', 'ms', 1],
