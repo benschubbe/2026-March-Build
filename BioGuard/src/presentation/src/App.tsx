@@ -5,7 +5,8 @@ import {
   Zap, Battery, Wind, Target
 } from 'lucide-react';
 import CsvUpload, { BiometricReading } from './components/CsvUpload';
-import { runCrossMetricAnalysis, Insight, Correlation, TrendBreak, AnalysisReport } from './analysis';
+import { runCrossMetricAnalysis, AnalysisReport } from './analysis';
+import { generateHealthReport, HealthReport, SystemAssessment } from './healthAssessment';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import './App.css';
 
@@ -282,6 +283,7 @@ function App() {
   const { summaries, anomalies, recs, score } = hasData ? analyze(allReadings) : { summaries: [], anomalies: [], recs: [], score: 0 };
   const motivation = hasData ? getMotivation(score, summaries) : null;
   const crossAnalysis = hasData ? runCrossMetricAnalysis(allReadings) : null;
+  const healthReport = hasData ? generateHealthReport(allReadings) : null;
 
   const sleepMetrics = summaries.filter(s => s.def.category === 'sleep');
   const activityMetrics = summaries.filter(s => s.def.category === 'activity');
@@ -318,6 +320,69 @@ function App() {
                 <span className="Motivation-Emoji">{motivation.emoji}</span>
                 <div><h3>{motivation.headline}</h3><p>{motivation.body}</p></div>
               </div>
+            </div>
+          )}
+
+          {healthReport && (
+            <div className="Card HealthReport-Card">
+              <div className="Card-Header"><Stethoscope size={20} /><h3>Comprehensive Health Assessment</h3>
+                <span className="Report-Meta">{healthReport.dataPoints} data points | {healthReport.daysAnalyzed} days</span>
+              </div>
+
+              <div className="Report-Overall">
+                <div className={`Overall-Grade grade-${healthReport.overallGrade}`}>{healthReport.overallGrade}</div>
+                <div className="Overall-Info">
+                  <div className="Overall-Score">Overall Health Score: {healthReport.overallScore}/100</div>
+                  <div className="Overall-Systems">{healthReport.systems.length} systems assessed</div>
+                </div>
+              </div>
+
+              <div className="Systems-Grid">
+                {healthReport.systems.map((sys, i) => (
+                  <div key={i} className={`System-Card grade-border-${sys.grade}`}>
+                    <div className="System-Header">
+                      <span className={`System-Grade grade-${sys.grade}`}>{sys.grade}</span>
+                      <div><strong>{sys.system}</strong><span className="System-Score">{sys.score}/100</span></div>
+                    </div>
+                    <p className="System-Summary">{sys.summary}</p>
+
+                    {sys.findings.length > 0 && (
+                      <div className="System-Section">
+                        <h5>Findings</h5>
+                        <ul>{sys.findings.map((f, j) => <li key={j}>{f}</li>)}</ul>
+                      </div>
+                    )}
+
+                    {sys.concerns.length > 0 && (
+                      <div className="System-Section concerns">
+                        <h5>Concerns</h5>
+                        <ul>{sys.concerns.map((c, j) => <li key={j}>{c}</li>)}</ul>
+                      </div>
+                    )}
+
+                    {sys.actions.length > 0 && (
+                      <div className="System-Section actions">
+                        <h5>Action Items</h5>
+                        <ul>{sys.actions.map((a, j) => <li key={j}>{a}</li>)}</ul>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {healthReport.topConcerns.length > 0 && (
+                <div className="Report-Concerns">
+                  <h4><AlertTriangle size={16} /> Top Concerns</h4>
+                  <ul>{healthReport.topConcerns.map((c, i) => <li key={i}>{c}</li>)}</ul>
+                </div>
+              )}
+
+              {healthReport.actionPlan.length > 0 && (
+                <div className="Report-Actions">
+                  <h4><Pill size={16} /> Personalised Action Plan</h4>
+                  <ol>{healthReport.actionPlan.map((a, i) => <li key={i}>{a}</li>)}</ol>
+                </div>
+              )}
             </div>
           )}
 
