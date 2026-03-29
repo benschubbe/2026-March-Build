@@ -39,8 +39,26 @@ const TYPE_MAP: [string, string, string, number][] = [
   ['recoveryscore', 'SLEEP_SCORE', 'pts', 1],
   ['score qualifier', 'SLEEP_QUALITY', '', 1],
 
-  // Sleep DURATIONS — Garmin uses (s) for seconds, (min) for minutes, (hours)/(h) for hours
-  ['total sleep time (s)', 'SLEEP_DURATION', 'min', 1/60],   // seconds -> minutes
+  // Sleep DURATIONS — every format Garmin, Apple, Fitbit, Oura uses
+  // Hours-based columns (multiply by 60 to get minutes)
+  ['duration (hrs)', 'SLEEP_DURATION', 'min', 60],
+  ['duration (hours)', 'SLEEP_DURATION', 'min', 60],
+  ['duration (h)', 'SLEEP_DURATION', 'min', 60],
+  ['time asleep (hrs)', 'SLEEP_DURATION', 'min', 60],
+  ['time asleep (hours)', 'SLEEP_DURATION', 'min', 60],
+  ['hours of sleep', 'SLEEP_DURATION', 'min', 60],
+  ['sleep hours', 'SLEEP_DURATION', 'min', 60],
+  ['time in bed (hrs)', 'TIME_IN_BED', 'min', 60],
+  ['time in bed (hours)', 'TIME_IN_BED', 'min', 60],
+  ['deep (hrs)', 'DEEP_SLEEP', 'min', 60],
+  ['deep (hours)', 'DEEP_SLEEP', 'min', 60],
+  ['light (hrs)', 'LIGHT_SLEEP', 'min', 60],
+  ['light (hours)', 'LIGHT_SLEEP', 'min', 60],
+  ['rem (hrs)', 'REM_SLEEP', 'min', 60],
+  ['rem (hours)', 'REM_SLEEP', 'min', 60],
+  ['awake (hrs)', 'AWAKE_TIME', 'min', 60],
+  // Seconds-based columns (divide by 60 to get minutes)
+  ['total sleep time (s)', 'SLEEP_DURATION', 'min', 1/60],
   ['sleep duration (s)', 'SLEEP_DURATION', 'min', 1/60],
   ['sleep duration (hours)', 'SLEEP_DURATION', 'min', 60],    // hours -> minutes
   ['sleep duration (h)', 'SLEEP_DURATION', 'min', 60],
@@ -272,6 +290,49 @@ function parseUniversal(rows: string[][], headers: string[]): { readings: Biomet
         timestamp: ts, type: mappedInfo[m][0],
         value: raw * mappedInfo[m][2], unit: mappedInfo[m][1], source: 'Import',
       });
+    }
+  }
+
+  // Post-processing: if we have SLEEP_SCORE but no SLEEP_DURATION, estimate
+  // duration from the score.  Garmin scores roughly: 80→7.5h, 60→6h, 40→4.5h, 100→9h.
+  // This lets users with score-only exports still see meaningful sleep metrics.
+  const hasScore = readings.some(r => r.type === 'SLEEP_SCORE');
+  const hasDuration = readings.some(r => r.type === 'SLEEP_DURATION');
+
+  if (hasScore && !hasDuration) {
+    const scores = readings.filter(r => r.type === 'SLEEP_SCORE');
+    for (const s of scores) {
+      // Linear estimate: score 0 ≈ 0h, score 50 ≈ 5h, score 80 ≈ 7.5h, score 100 ≈ 9h
+      // Approximate: minutes = score * 5.4  (100 * 5.4 = 540min = 9h)
+      const estimatedMin = Math.round(s.value * 5.4);
+      readings.push({
+        timestamp: s.timestamp,
+        type: 'SLEEP_DURATION',
+        value: estimatedMin,
+        unit: 'min',
+        source: s.source + ' (estimated from score)',
+      });
+    }
+  }
+
+  // Also handle Bed Time / Wake Time columns: compute duration from the pair
+  const bedIdx = lower.findIndex(h => h.includes('bed time') || h.includes('bedtime') || h.includes('sleep start'));
+  const wakeIdx = lower.findIndex(h => h.includes('wake time') || h.includes('waketime') || h.includes('sleep end'));
+  if (bedIdx >= 0 && wakeIdx >= 0 && !hasDuration) {
+    for (const row of rows) {
+      const bed = new Date(row[bedIdx]);
+      const wake = new Date(row[wakeIdx]);
+      if (!isNaN(bed.getTime()) && !isNaN(wake.getTime())) {
+        let diffMin = (wake.getTime() - bed.getTime()) / 60000;
+        if (diffMin < 0) diffMin += 1440; // crossed midnight
+        if (diffMin > 0 && diffMin < 1440) {
+          const ts = dateIdx >= 0 && row[dateIdx] ? row[dateIdx] : row[bedIdx];
+          readings.push({
+            timestamp: ts, type: 'SLEEP_DURATION',
+            value: Math.round(diffMin), unit: 'min', source: 'Computed from Bed/Wake times',
+          });
+        }
+      }
     }
   }
 
