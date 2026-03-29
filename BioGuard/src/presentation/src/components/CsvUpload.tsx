@@ -302,16 +302,29 @@ function parseUniversal(rows: string[][], headers: string[]): { readings: Biomet
   if (hasScore && !hasDuration) {
     const scores = readings.filter(r => r.type === 'SLEEP_SCORE');
     for (const s of scores) {
-      // Linear estimate: score 0 ≈ 0h, score 50 ≈ 5h, score 80 ≈ 7.5h, score 100 ≈ 9h
-      // Approximate: minutes = score * 5.4  (100 * 5.4 = 540min = 9h)
-      const estimatedMin = Math.round(s.value * 5.4);
-      readings.push({
-        timestamp: s.timestamp,
-        type: 'SLEEP_DURATION',
-        value: estimatedMin,
-        unit: 'min',
-        source: s.source + ' (estimated from score)',
-      });
+      if (s.value <= 0) continue;
+      // Garmin sleep scores are 0-100.  If value looks like it's already in
+      // hours (< 15) or minutes (> 100), don't convert — just use as-is.
+      let estimatedMin: number;
+      if (s.value > 100) {
+        // Already in minutes (or seconds if very large)
+        estimatedMin = s.value > 1000 ? Math.round(s.value / 60) : Math.round(s.value);
+      } else if (s.value <= 12) {
+        // Likely hours
+        estimatedMin = Math.round(s.value * 60);
+      } else {
+        // 13-100 range: treat as Garmin score (0-100)
+        estimatedMin = Math.round(s.value * 5.4);
+      }
+      if (estimatedMin > 0 && estimatedMin < 1440) {
+        readings.push({
+          timestamp: s.timestamp,
+          type: 'SLEEP_DURATION',
+          value: estimatedMin,
+          unit: 'min',
+          source: s.source + ' (estimated)',
+        });
+      }
     }
   }
 
@@ -336,7 +349,22 @@ function parseUniversal(rows: string[][], headers: string[]): { readings: Biomet
     }
   }
 
-  return { readings, debug: mappedCols.length === 0 ? 'No columns matched any known metric name.' : '' };
+  // Build debug info showing exactly what was matched
+  const debugParts: string[] = [];
+  if (mappedCols.length > 0) {
+    const matched = mappedCols.map((col, i) => headers[col] + ' -> ' + mappedInfo[i][0]).join(', ');
+    debugParts.push('Matched: ' + matched);
+  } else {
+    debugParts.push('No columns matched any known metric name.');
+  }
+
+  // Show sample values for first matched column to help diagnose scaling issues
+  if (readings.length > 0) {
+    const first3 = readings.slice(0, 3);
+    debugParts.push('Sample: ' + first3.map(r => r.type + '=' + r.value.toFixed(1) + r.unit).join(', '));
+  }
+
+  return { readings, debug: debugParts.join(' | ') };
 }
 
 // ---------------------------------------------------------------------------
