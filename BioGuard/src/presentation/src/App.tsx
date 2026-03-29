@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   ShieldCheck, Moon, Footprints, Heart, AlertTriangle, TrendingDown,
   TrendingUp, ArrowRight, Pill, Stethoscope, BarChart3, Lock, Flame,
-  Zap, Battery, Wind, Target, Award, ThumbsUp
+  Zap, Battery, Wind, Target
 } from 'lucide-react';
 import CsvUpload, { BiometricReading } from './components/CsvUpload';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';

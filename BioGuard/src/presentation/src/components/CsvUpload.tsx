@@ -104,19 +104,72 @@ const COLUMN_MAP: Record<string, [string, string, number]> = {
   'glucose':                     ['BLOOD_GLUCOSE', 'mg/dL', 1],
 };
 
-const HEALTHKIT_TYPE_MAP: Record<string, [string, string]> = {
+// Full Apple HealthKit type identifiers — exact match on lowercased values
+const HEALTHKIT_EXACT: Record<string, [string, string]> = {
   'hkquantitytypeidentifierheartratevariabilitysdnn': ['HRV_RMSSD', 'ms'],
   'hkquantitytypeidentifierrestingheartrate': ['RESTING_HEART_RATE', 'bpm'],
   'hkquantitytypeidentifierheartrate': ['AVG_HEART_RATE', 'bpm'],
   'hkquantitytypeidentifierbloodglucose': ['BLOOD_GLUCOSE', 'mg/dL'],
   'hkquantitytypeidentifierstepcount': ['STEP_COUNT', 'steps'],
-  'hkcategorytypeidentifiersleepanalysis': ['SLEEP_DURATION', 'min'],
   'hkquantitytypeidentifieractivecalories': ['ACTIVE_CALORIES', 'kcal'],
+  'hkquantitytypeidentifieractiveenergyburned': ['ACTIVE_CALORIES', 'kcal'],
+  'hkquantitytypeidentifierbasalenergyburned': ['CALORIES_BURNED', 'kcal'],
   'hkquantitytypeidentifierdistancewalkingrunning': ['DISTANCE', 'km'],
+  'hkquantitytypeidentifierdistancecycling': ['DISTANCE', 'km'],
   'hkquantitytypeidentifierflightsclimbed': ['FLOORS_CLIMBED', 'floors'],
   'hkquantitytypeidentifierrespiratoryrate': ['RESPIRATION_RATE', 'brpm'],
   'hkquantitytypeidentifieroxygenssaturation': ['SPO2', '%'],
+  'hkquantitytypeidentifiervo2max': ['VO2_MAX', 'mL/kg/min'],
+  'hkquantitytypeidentifierbodymass': ['BODY_MASS', 'kg'],
+  'hkquantitytypeidentifierbodyfattpercentage': ['BODY_FAT', '%'],
+  'hkquantitytypeidentifierbloodpressuresystolic': ['BP_SYSTOLIC', 'mmHg'],
+  'hkquantitytypeidentifierbloodpressurediastolic': ['BP_DIASTOLIC', 'mmHg'],
+  'hkquantitytypeidentifierbodytemperature': ['BODY_TEMP', 'degC'],
+  'hkcategorytypeidentifiersleepanalysis': ['SLEEP_DURATION', 'min'],
+  'hkquantitytypeidentifierappleexercisetime': ['INTENSITY_MINUTES', 'min'],
+  'hkquantitytypeidentifierapplestandtime': ['STAND_TIME', 'min'],
+  'hkquantitytypeidentifierapplestandhour': ['STAND_HOURS', 'hours'],
+  'hkquantitytypeidentifierenvironmentalaudioexposure': ['NOISE_EXPOSURE', 'dB'],
+  'hkquantitytypeidentifierheadphoneaudioexposure': ['HEADPHONE_AUDIO', 'dB'],
 };
+
+// Substring keywords for fuzzy matching Apple types we haven't seen before
+const HEALTHKIT_FUZZY: [string, string, string][] = [
+  // [substring to find in the type value, mapped type, unit]
+  ['heartratevariability', 'HRV_RMSSD', 'ms'],
+  ['restingheartrate', 'RESTING_HEART_RATE', 'bpm'],
+  ['heartrate', 'AVG_HEART_RATE', 'bpm'],
+  ['bloodglucose', 'BLOOD_GLUCOSE', 'mg/dL'],
+  ['stepcount', 'STEP_COUNT', 'steps'],
+  ['sleepanalysis', 'SLEEP_DURATION', 'min'],
+  ['activecalories', 'ACTIVE_CALORIES', 'kcal'],
+  ['activeenergyburned', 'ACTIVE_CALORIES', 'kcal'],
+  ['basalenergyburned', 'CALORIES_BURNED', 'kcal'],
+  ['distancewalking', 'DISTANCE', 'km'],
+  ['distancecycling', 'DISTANCE', 'km'],
+  ['flightsclimbed', 'FLOORS_CLIMBED', 'floors'],
+  ['respiratoryrate', 'RESPIRATION_RATE', 'brpm'],
+  ['oxygensaturation', 'SPO2', '%'],
+  ['exercisetime', 'INTENSITY_MINUTES', 'min'],
+  ['vo2max', 'VO2_MAX', 'mL/kg/min'],
+  ['bodymass', 'BODY_MASS', 'kg'],
+  ['bodyfat', 'BODY_FAT', '%'],
+  ['bloodpressure', 'BP_SYSTOLIC', 'mmHg'],
+  ['bodytemperature', 'BODY_TEMP', 'degC'],
+  ['standtime', 'STAND_TIME', 'min'],
+];
+
+function mapAppleType(raw: string): [string, string] | null {
+  const lower = raw.toLowerCase().trim();
+  // Exact match first
+  const exact = HEALTHKIT_EXACT[lower];
+  if (exact) return exact;
+  // Fuzzy substring match
+  for (let i = 0; i < HEALTHKIT_FUZZY.length; i++) {
+    if (lower.includes(HEALTHKIT_FUZZY[i][0])) return [HEALTHKIT_FUZZY[i][1], HEALTHKIT_FUZZY[i][2]];
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // Parsing
@@ -138,15 +191,21 @@ function parseCSV(text: string): string[][] {
 
 function detectFormat(headers: string[]): 'apple' | 'garmin' | 'generic' {
   const lower = headers.map(h => h.toLowerCase().trim());
-  // Apple Health: has "type" + "sourceName"
-  if (lower.includes('type') && (lower.includes('sourcename') || lower.includes('source name'))) return 'apple';
-  // Garmin / any tracker: if ANY header matches our column map, treat as garmin-style
+  // Apple Health: has "type" + ("sourcename" or "source name" or "sourceversion")
+  const hasType = lower.includes('type');
+  const hasAppleSource = lower.some(h => h === 'sourcename' || h === 'source name' || h === 'sourceversion' || h === 'source version');
+  if (hasType && hasAppleSource) return 'apple';
+  // Also detect Apple if any row's type column contains "hk" (HealthKit identifiers)
+  // (detected during parse, not here — but if we see "unit" + "type" + "value" it's likely Apple)
+  if (hasType && lower.includes('value') && lower.includes('unit')) return 'apple';
+  // Garmin / any tracker: if ANY header matches our column map
+  const colKeys = Object.keys(COLUMN_MAP);
   if (lower.some(h => COLUMN_MAP[h] !== undefined)) return 'garmin';
+  // Fuzzy garmin detection
+  if (lower.some(h => colKeys.some(k => h.includes(k) || k.includes(h)))) return 'garmin';
   // Generic: has "type" + "value"
-  if (lower.includes('type') && lower.includes('value')) return 'generic';
-  // Fallback: try garmin-style anyway with fuzzy matching
-  if (lower.some(h => Object.keys(COLUMN_MAP).some(k => h.includes(k) || k.includes(h)))) return 'garmin';
-  return 'generic'; // never return unknown — try to parse everything
+  if (hasType && lower.includes('value')) return 'generic';
+  return 'generic'; // always try
 }
 
 function parseGarminStyle(rows: string[][], headers: string[]): BiometricReading[] {
@@ -192,20 +251,25 @@ function parseApple(rows: string[][], headers: string[]): BiometricReading[] {
   const lower = headers.map(h => h.toLowerCase().trim());
   const typeIdx = lower.indexOf('type');
   const valIdx = lower.indexOf('value');
-  const startIdx = lower.findIndex(h => h.includes('start'));
-  const srcIdx = lower.findIndex(h => h.includes('source'));
+  // Apple exports use "startDate", "Start Date", "creationDate", etc.
+  const startIdx = lower.findIndex(h => h.includes('start') || h.includes('creation') || h.includes('date'));
+  // "sourceName" or "Source Name" — skip "sourceVersion"
+  const srcIdx = lower.findIndex(h => (h.includes('source') && h.includes('name')) || h === 'sourcename');
+
+  if (typeIdx < 0 || valIdx < 0) return [];
 
   const readings: BiometricReading[] = [];
   for (const row of rows) {
-    const rawType = (row[typeIdx] || '').toLowerCase().trim();
-    const mapped = HEALTHKIT_TYPE_MAP[rawType];
+    if (row.length <= Math.max(typeIdx, valIdx)) continue;
+    const rawType = row[typeIdx] || '';
+    const mapped = mapAppleType(rawType);
     if (!mapped) continue;
     const value = parseFloat(row[valIdx]);
     if (isNaN(value)) continue;
     readings.push({
-      timestamp: row[startIdx] || new Date().toISOString(),
+      timestamp: (startIdx >= 0 ? row[startIdx] : '') || new Date().toISOString(),
       type: mapped[0], value, unit: mapped[1],
-      source: row[srcIdx] || 'Apple Health',
+      source: (srcIdx >= 0 ? row[srcIdx] : '') || 'Apple Health',
     });
   }
   return readings;
