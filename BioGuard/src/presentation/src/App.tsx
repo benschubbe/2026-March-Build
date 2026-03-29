@@ -5,6 +5,7 @@ import {
   Zap, Battery, Wind, Target
 } from 'lucide-react';
 import CsvUpload, { BiometricReading } from './components/CsvUpload';
+import ActionChecklist from './components/ActionChecklist';
 import { runCrossMetricAnalysis, AnalysisReport } from './analysis';
 import { generateHealthReport, HealthReport, SystemAssessment } from './healthAssessment';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -462,23 +463,7 @@ function App() {
             </div>
           )}
 
-          {recs.length > 0 && (
-            <div className="Card Recs-Card">
-              <div className="Card-Header"><Stethoscope size={18} /><h3>Recommendations ({recs.length})</h3></div>
-              <div className="Recs-List">
-                {recs.map((r, i) => (
-                  <div key={i} className={`Rec-Card priority-${r.priority}`}>
-                    <div className="Rec-Icon">{r.cat === 'supplement' ? <Pill size={20} /> : r.cat === 'doctor' ? <Stethoscope size={20} /> : <Footprints size={20} />}</div>
-                    <div className="Rec-Content">
-                      <div className="Rec-Title"><strong>{r.title}</strong><span className={`Priority-Tag ${r.priority}`}>{r.priority.toUpperCase()}</span><span className="Category-Tag">{r.cat}</span></div>
-                      <p>{r.detail}</p>
-                      <span className="Rec-Source">{r.source}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {recs.length > 0 && <ActionChecklist actions={recs} />}
 
           {!hasData && (
             <div className="Empty-Dashboard Card">

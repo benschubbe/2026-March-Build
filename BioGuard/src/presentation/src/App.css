@@ -1365,6 +1365,60 @@ body {
 .Report-Actions ol { margin: 0; padding-left: 20px; }
 .Report-Actions li { font-size: 13px; color: var(--text-primary); line-height: 1.6; margin-bottom: 6px; }
 
+/* Action Checklist */
+.ActionChecklist-Card { padding: 20px; }
+.Checklist-Header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.Checklist-Progress { margin-left: auto; font-size: 12px; color: var(--text-secondary); }
+
+.Progress-Bar { height: 4px; background: var(--border-color); border-radius: 2px; margin-bottom: 16px; overflow: hidden; }
+.Progress-Fill { height: 100%; background: var(--success); border-radius: 2px; transition: width 0.3s ease; }
+
+.Swipe-Container { display: flex; align-items: center; gap: 8px; }
+.Swipe-Btn { background: none; border: 1px solid var(--border-color); border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); cursor: pointer; flex-shrink: 0; }
+.Swipe-Btn:hover:not(:disabled) { border-color: var(--accent-color); color: var(--accent-color); }
+.Swipe-Btn:disabled { opacity: 0.3; cursor: default; }
+
+.Action-Swipe-Card {
+  flex: 1; padding: 20px; border-radius: 10px; border: 1px solid var(--border-color);
+  background: rgba(22,27,34,0.6); transition: all 0.3s ease; min-height: 180px;
+}
+.Action-Swipe-Card.done { opacity: 0.6; border-color: var(--success); }
+.Action-Swipe-Card.priority-high { border-left: 3px solid var(--danger); }
+.Action-Swipe-Card.priority-medium { border-left: 3px solid var(--warning); }
+.Action-Swipe-Card.priority-low { border-left: 3px solid var(--text-secondary); }
+
+.Swipe-Card-Top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.Swipe-Icon { color: var(--accent-color); }
+.Swipe-Meta { display: flex; gap: 6px; }
+
+.Action-Swipe-Card h4 { margin: 0 0 8px; font-size: 16px; color: var(--text-primary); }
+.Action-Swipe-Card h4.line-through { text-decoration: line-through; opacity: 0.5; }
+.Action-Swipe-Card p { font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin: 0 0 8px; }
+.Swipe-Source { font-size: 10px; color: var(--text-secondary); opacity: 0.5; font-style: italic; display: block; margin-bottom: 12px; }
+
+.Check-Btn {
+  display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 6px;
+  border: 1px solid var(--border-color); background: none; color: var(--text-secondary);
+  cursor: pointer; font-size: 13px; transition: all 0.2s;
+}
+.Check-Btn:hover { border-color: var(--success); color: var(--success); }
+.Check-Btn.checked { border-color: var(--success); color: var(--success); background: rgba(63,185,80,0.08); }
+
+.Swipe-Dots { display: flex; justify-content: center; gap: 6px; margin-top: 12px; }
+.Dot {
+  width: 8px; height: 8px; border-radius: 50%; border: none;
+  background: var(--border-color); cursor: pointer; padding: 0; transition: all 0.2s;
+}
+.Dot.active { background: var(--accent-color); transform: scale(1.3); }
+.Dot.done { background: var(--success); }
+
+.All-Done {
+  display: flex; align-items: center; gap: 10px; justify-content: center;
+  margin-top: 16px; padding: 12px; border-radius: 8px;
+  background: rgba(63,185,80,0.08); border: 1px solid rgba(63,185,80,0.2);
+  color: var(--success); font-size: 14px; font-weight: 500;
+}
+
 /* --- CSV Upload --- */
 .Import-Row {
   display: grid;

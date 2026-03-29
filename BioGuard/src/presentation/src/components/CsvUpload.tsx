@@ -349,22 +349,20 @@ function parseUniversal(rows: string[][], headers: string[]): { readings: Biomet
     }
   }
 
-  // Build debug info showing exactly what was matched
+  // Build debug info showing every matched column with raw -> scaled values
   const debugParts: string[] = [];
   if (mappedCols.length > 0) {
-    const matched = mappedCols.map((col, i) => headers[col] + ' -> ' + mappedInfo[i][0]).join(', ');
-    debugParts.push('Matched: ' + matched);
+    const details = mappedCols.map((col, i) => {
+      const rawVal = rows.length > 0 ? rows[0][col] : '?';
+      const scale = mappedInfo[i][2];
+      return '"' + headers[col] + '" -> ' + mappedInfo[i][0] + ' (raw=' + rawVal + ', scale=' + scale.toFixed(4) + ')';
+    });
+    debugParts.push('Columns: ' + details.join(' | '));
   } else {
-    debugParts.push('No columns matched any known metric name.');
+    debugParts.push('No columns matched. Headers: ' + headers.join(', '));
   }
 
-  // Show sample values for first matched column to help diagnose scaling issues
-  if (readings.length > 0) {
-    const first3 = readings.slice(0, 3);
-    debugParts.push('Sample: ' + first3.map(r => r.type + '=' + r.value.toFixed(1) + r.unit).join(', '));
-  }
-
-  return { readings, debug: debugParts.join(' | ') };
+  return { readings, debug: debugParts.join('') };
 }
 
 // ---------------------------------------------------------------------------
