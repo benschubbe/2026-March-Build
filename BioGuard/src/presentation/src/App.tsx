@@ -1,167 +1,265 @@
-import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
-import { io, Socket } from 'socket.io-client';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Stars, ContactShadows, Environment } from '@react-three/drei';
+import React, { useState } from 'react';
 import {
-  Activity,
   ShieldCheck,
-  Zap,
+  Moon,
+  Footprints,
+  Heart,
+  AlertTriangle,
+  TrendingDown,
+  TrendingUp,
+  Pill,
+  Stethoscope,
+  ArrowRight,
+  BarChart3,
   Settings as SettingsIcon,
-  Lock,
-  Cpu,
-  History as HistoryIcon,
-  Play,
-  Shield
+  Lock
 } from 'lucide-react';
-import TwinModel from './components/TwinModel';
-import MetabolicChart from './components/MetabolicChart';
-import HistoryView from './components/HistoryView';
-import ScenarioView from './components/ScenarioView';
-import SettingsView from './components/SettingsView';
-import PhysicianBriefView from './components/PhysicianBriefView';
-import AuditTrailView from './components/AuditTrailView';
 import CsvUpload, { BiometricReading } from './components/CsvUpload';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import './App.css';
 
-// --- Environment Configuration ---
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-const WS_URL = process.env.REACT_APP_WS_URL || 'http://localhost:50052';
+// ---------------------------------------------------------------------------
+// Analysis helpers — all client-side, zero data transmitted
+// ---------------------------------------------------------------------------
 
-// --- Demo fallback data (used when backend is unreachable, e.g. Vercel) ---
-const DEMO_BRIEF = {
-  brief_id: "BG-DEMO0001",
-  generated_at: new Date().toISOString(),
-  patient_summary: "Patient PT-2026-DEMO. Biometric correlation detected following initiation of Atorvastatin 20mg.",
-  lab_flags: [
-    { loinc_code: "4544-3", display_name: "Hemoglobin A1c", value: 6.4, unit: "%", reference_range: { low: 4.0, high: 5.6 }, status: "final" },
-    { loinc_code: "2093-3", display_name: "Total Cholesterol", value: 224.0, unit: "mg/dL", reference_range: { low: 125.0, high: 200.0 }, status: "final" },
-    { loinc_code: "2157-6", display_name: "Creatine Kinase (CK)", value: 190.0, unit: "U/L", reference_range: { low: 22.0, high: 198.0 }, status: "final" },
-    { loinc_code: "2339-0", display_name: "Fasting Glucose", value: 96.0, unit: "mg/dL", reference_range: { low: 70.0, high: 100.0 }, status: "final" },
-    { loinc_code: "1742-6", display_name: "ALT (SGPT)", value: 32.0, unit: "U/L", reference_range: { low: 7.0, high: 56.0 }, status: "final" },
-  ],
-  drug_flags: [
-    { drug_pair: { primary: "Atorvastatin", interactant: "Metformin" }, severity: "HIGH", fda_report_count: 847, personalized_risk_score: 0.71 },
-    { drug_pair: { primary: "Atorvastatin", interactant: "Magnesium" }, severity: "MEDIUM", fda_report_count: 124, personalized_risk_score: 0.41 },
-  ],
-  anomaly_signals: [
-    { biometric: "HRV_RMSSD", protocol_event: "evening_dose", pearson_r: -0.84, p_value: 0.001, confidence_interval: { lower: -0.92, upper: -0.71 }, window_hours: 96, severity: "HIGH" },
-    { biometric: "SLEEP_ANALYSIS", protocol_event: "evening_dose", pearson_r: -0.88, p_value: 0.001, confidence_interval: { lower: -0.97, upper: -0.62 }, window_hours: 96, severity: "HIGH" },
-    { biometric: "BLOOD_GLUCOSE", protocol_event: "evening_dose", pearson_r: 0.78, p_value: 0.001, confidence_interval: { lower: 0.37, upper: 0.94 }, window_hours: 96, severity: "MEDIUM" },
-  ],
-  soap_note: "S: Patient reports initiation of Atorvastatin 20mg alongside existing protocol.\nO: HRV_RMSSD correlation r=-0.84 (p=0.0010, 95% CI [-0.92, -0.71]) over 96h window. Baseline shifts: HRV 37.3->33.4ms (-10.5%, d=-1.48); Sleep 452->410min (-9.4%, d=-1.84); Glucose 87.8->92.3mg/dL (+5.2%, d=1.68). Post-dose window: HRV [0-4h] 32.1 vs 35.0ms (-8.3%, d=-0.86).\nA: Multi-stream pharmacovigilance analysis with Bonferroni correction (alpha=0.0056). Correlation flagged for physician review.\nP: Discuss findings with care team. Professional consultation strongly recommended.",
-  audit_hash: "c961bb4884e3e185bd2b1abf90712eaa334c89355dbc4da3e2a9a0c6935cd103",
-  compliance_version: "FDA-GW-2016-V47",
-};
+interface MetricSummary {
+  label: string;
+  avg: number;
+  min: number;
+  max: number;
+  unit: string;
+  trend: 'up' | 'down' | 'stable';
+  trendPct: number;
+  readings: number;
+  anomalies: number;
+  data: { date: string; value: number }[];
+}
 
-const DEMO_REPORT = [
-  { agent: "The Scribe", message: "LOINC normalised 5 panels. Abnormal: 2 — HbA1c=6.4% (HIGH), Cholesterol=224.0mg/dL (HIGH)", confidence: 0.94, timestamp: new Date().toISOString() },
-  { agent: "The Pharmacist", message: "openFDA FAERS: 847 reports for Atorvastatin x Metformin (HIGH). Personalised risk 71%. CK within range.", confidence: 0.96, timestamp: new Date().toISOString() },
-  { agent: "The Correlation Engine", message: "Multi-stream analysis: 3 biometrics, 9 tests, Bonferroni alpha=0.0056. HRV baseline 37.3->33.4ms (-10.5%, d=-1.48). Post-dose window HRV -8.3% (d=-0.86).", confidence: 0.91, timestamp: new Date().toISOString() },
-  { agent: "The Compliance Auditor", message: "Safe Harbor: PASSED. FDA-GW-2016-V47 — 47 rules, 0 violations. Audit chain sealed (4 entries, integrity=VERIFIED).", confidence: 1.0, timestamp: new Date().toISOString() },
-];
+interface Anomaly {
+  type: string;
+  date: string;
+  value: number;
+  expected: string;
+  severity: 'low' | 'medium' | 'high';
+  message: string;
+}
 
-const DEMO_RECOMMENDATIONS = [
-  { type: "Clinical", priority: "HIGH", action: "Review HRV_RMSSD correlation with evening_dose (96h window).", evidence: "r=-0.84, p=0.001, CI [-0.92, -0.71]. Baseline shift: -10.5% (Cohen's d=-1.48)" },
-  { type: "Clinical", priority: "HIGH", action: "Review SLEEP_ANALYSIS degradation post-dose.", evidence: "r=-0.88, p=0.001. Baseline: 452->410min (-9.4%, d=-1.84)" },
-  { type: "Pharmacological", priority: "HIGH", action: "Atorvastatin x Metformin (847 FAERS reports).", evidence: "Personalised risk: 71%" },
-  { type: "Compliance", priority: "LOW", action: "Safe Harbor validated — FDA-GW-2016-V47 (47 rules passed).", evidence: "Audit chain: c961bb48..." },
-];
+interface Recommendation {
+  category: 'supplement' | 'lifestyle' | 'doctor';
+  title: string;
+  detail: string;
+  priority: 'low' | 'medium' | 'high';
+  source: string;
+}
 
-const DEMO_AUDIT = [
-  "a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd",
-  "b2c3d4e5f6789012345678901234567890123456789012345678901234abcde",
-  "c3d4e5f6789012345678901234567890123456789012345678901234abcdef",
-  "d4e5f6789012345678901234567890123456789012345678901234abcdef01",
-];
+const SLEEP_NORMAL = { low: 420, high: 540, unit: 'min' };  // 7-9 hours
+const HRV_NORMAL = { low: 20, high: 60, unit: 'ms' };
+const HR_NORMAL = { low: 50, high: 85, unit: 'bpm' };
+const STEPS_NORMAL = { low: 6000, high: 12000, unit: 'steps' };
 
-interface Recommendation { type: string; priority: string; action: string; evidence: string; }
+function summarize(readings: BiometricReading[], type: string, label: string, unit: string, normLow: number, normHigh: number): MetricSummary | null {
+  const filtered = readings.filter(r => r.type === type).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  if (filtered.length === 0) return null;
 
-type AppView = 'dashboard' | 'history' | 'scenarios' | 'settings';
+  const values = filtered.map(r => r.value);
+  const avg = values.reduce((s, v) => s + v, 0) / values.length;
+  const firstHalf = values.slice(0, Math.floor(values.length / 2));
+  const secondHalf = values.slice(Math.floor(values.length / 2));
+  const firstAvg = firstHalf.length ? firstHalf.reduce((s, v) => s + v, 0) / firstHalf.length : avg;
+  const secondAvg = secondHalf.length ? secondHalf.reduce((s, v) => s + v, 0) / secondHalf.length : avg;
+  const trendPct = firstAvg !== 0 ? ((secondAvg - firstAvg) / firstAvg) * 100 : 0;
+
+  let anomalies = 0;
+  for (const v of values) {
+    if (v < normLow * 0.85 || v > normHigh * 1.15) anomalies++;
+  }
+
+  return {
+    label, unit, avg: Math.round(avg * 10) / 10,
+    min: Math.round(Math.min(...values) * 10) / 10,
+    max: Math.round(Math.max(...values) * 10) / 10,
+    trend: trendPct > 3 ? 'up' : trendPct < -3 ? 'down' : 'stable',
+    trendPct: Math.round(trendPct * 10) / 10,
+    readings: filtered.length,
+    anomalies,
+    data: filtered.map(r => ({ date: new Date(r.timestamp).toLocaleDateString(), value: Math.round(r.value * 10) / 10 })),
+  };
+}
+
+function detectAnomalies(readings: BiometricReading[]): Anomaly[] {
+  const anomalies: Anomaly[] = [];
+  const byType: Record<string, BiometricReading[]> = {};
+  for (const r of readings) {
+    (byType[r.type] = byType[r.type] || []).push(r);
+  }
+
+  const checks: { type: string; label: string; low: number; high: number; unit: string }[] = [
+    { type: 'SLEEP_ANALYSIS', label: 'Sleep Duration', low: 420, high: 540, unit: 'min' },
+    { type: 'HRV_RMSSD', label: 'HRV (RMSSD)', low: 20, high: 60, unit: 'ms' },
+    { type: 'RESTING_HEART_RATE', label: 'Resting HR', low: 50, high: 85, unit: 'bpm' },
+    { type: 'STEP_COUNT', label: 'Daily Steps', low: 6000, high: 12000, unit: 'steps' },
+  ];
+
+  for (const check of checks) {
+    const data = byType[check.type] || [];
+    for (const r of data) {
+      if (r.value < check.low * 0.85) {
+        anomalies.push({
+          type: check.label, date: new Date(r.timestamp).toLocaleDateString(),
+          value: r.value, expected: `${check.low}-${check.high} ${check.unit}`,
+          severity: r.value < check.low * 0.7 ? 'high' : 'medium',
+          message: `${check.label} critically low at ${Math.round(r.value)} ${check.unit}`,
+        });
+      } else if (r.value > check.high * 1.15) {
+        anomalies.push({
+          type: check.label, date: new Date(r.timestamp).toLocaleDateString(),
+          value: r.value, expected: `${check.low}-${check.high} ${check.unit}`,
+          severity: r.value > check.high * 1.3 ? 'high' : 'medium',
+          message: `${check.label} elevated at ${Math.round(r.value)} ${check.unit}`,
+        });
+      }
+    }
+    // Trend anomaly: 3+ consecutive declining values
+    if (data.length >= 5) {
+      const sorted = [...data].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      let declineStreak = 0;
+      for (let i = 1; i < sorted.length; i++) {
+        if (sorted[i].value < sorted[i - 1].value * 0.95) declineStreak++;
+        else declineStreak = 0;
+        if (declineStreak >= 3) {
+          anomalies.push({
+            type: check.label, date: new Date(sorted[i].timestamp).toLocaleDateString(),
+            value: sorted[i].value, expected: 'Stable or improving trend',
+            severity: 'medium',
+            message: `${check.label} declining for ${declineStreak + 1} consecutive readings`,
+          });
+          break;
+        }
+      }
+    }
+  }
+  return anomalies.slice(0, 10); // cap at 10
+}
+
+function generateRecommendations(summaries: (MetricSummary | null)[], anomalies: Anomaly[]): Recommendation[] {
+  const recs: Recommendation[] = [];
+  const sleep = summaries.find(s => s && s.label === 'Sleep Duration');
+  const hrv = summaries.find(s => s && s.label === 'HRV (RMSSD)');
+  const steps = summaries.find(s => s && s.label === 'Daily Steps');
+  const hr = summaries.find(s => s && s.label === 'Resting Heart Rate');
+
+  if (sleep && sleep.avg < 420) {
+    recs.push({ category: 'supplement', title: 'Magnesium Glycinate (200-400mg)', detail: 'Low sleep duration detected. Magnesium glycinate taken 1h before bed supports GABA activity and may improve sleep onset latency and total duration.', priority: 'high', source: 'Abbasi et al., J Res Med Sci, 2012' });
+    recs.push({ category: 'lifestyle', title: 'Sleep Hygiene Protocol', detail: `Average sleep is ${Math.round(sleep.avg)} min (${(sleep.avg/60).toFixed(1)}h). Target 7-9 hours. Limit screen exposure 1h before bed, keep bedroom at 65-68°F, maintain consistent sleep/wake times.`, priority: 'high', source: 'CDC Sleep Guidelines' });
+  } else if (sleep && sleep.avg < 480) {
+    recs.push({ category: 'lifestyle', title: 'Extend Sleep Window', detail: `Average sleep is ${Math.round(sleep.avg)} min (${(sleep.avg/60).toFixed(1)}h). Aim for 480+ min. Consider moving bedtime 30 min earlier.`, priority: 'medium', source: 'Walker, Why We Sleep, 2017' });
+  }
+
+  if (hrv && hrv.avg < 25) {
+    recs.push({ category: 'supplement', title: 'Omega-3 (EPA/DHA 1000-2000mg)', detail: 'Low HRV indicates reduced autonomic flexibility. Omega-3 supplementation has demonstrated HRV improvement in multiple RCTs.', priority: 'high', source: 'Xin et al., Eur J Clin Nutr, 2013' });
+    recs.push({ category: 'doctor', title: 'Discuss HRV with Physician', detail: `Average HRV is ${hrv.avg}ms (normal: 20-60ms). Persistently low HRV may warrant cardiac or autonomic evaluation.`, priority: 'high', source: 'Clinical threshold' });
+  } else if (hrv && hrv.trend === 'down' && Math.abs(hrv.trendPct) > 10) {
+    recs.push({ category: 'doctor', title: 'HRV Declining Trend', detail: `HRV decreased ${Math.abs(hrv.trendPct).toFixed(1)}% over the observation period. Discuss with physician — declining HRV can indicate stress, medication effects, or autonomic changes.`, priority: 'medium', source: 'Shaffer & Ginsberg, Front Public Health, 2017' });
+  }
+  if (hrv && hrv.avg >= 25) {
+    recs.push({ category: 'lifestyle', title: 'Maintain HRV with Recovery', detail: `HRV averaging ${hrv.avg}ms is within range. Prioritize recovery days after intense training. Avoid alcohol within 3h of sleep.`, priority: 'low', source: 'General wellness guidance' });
+  }
+
+  if (steps && steps.avg < 6000) {
+    recs.push({ category: 'lifestyle', title: 'Increase Daily Movement', detail: `Average ${Math.round(steps.avg)} steps/day. Target 7,000-10,000. Add a 20-min walk after meals to improve insulin sensitivity and cardiovascular health.`, priority: 'medium', source: 'Tudor-Locke et al., Int J Behav Nutr Phys Act, 2011' });
+    recs.push({ category: 'supplement', title: 'Vitamin D3 (1000-2000 IU)', detail: 'Low activity often correlates with reduced sun exposure. Vitamin D supports bone health, immune function, and mood regulation.', priority: 'low', source: 'Holick, NEJM, 2007' });
+  }
+
+  if (hr && hr.avg > 80) {
+    recs.push({ category: 'lifestyle', title: 'Cardio Conditioning', detail: `Resting HR averaging ${Math.round(hr.avg)} bpm. Aerobic exercise 3-5x/week (zone 2, conversational pace) can lower resting HR by 5-15 bpm over 8-12 weeks.`, priority: 'medium', source: 'AHA Exercise Guidelines' });
+  }
+
+  if (anomalies.filter(a => a.severity === 'high').length >= 3) {
+    recs.push({ category: 'doctor', title: 'Multiple High-Severity Anomalies', detail: `${anomalies.filter(a => a.severity === 'high').length} high-severity anomalies detected. Schedule a wellness check to discuss these findings with your physician.`, priority: 'high', source: 'BioGuardian anomaly threshold' });
+  }
+
+  if (recs.length === 0) {
+    recs.push({ category: 'lifestyle', title: 'All Metrics Within Range', detail: 'Your sleep and activity data looks healthy. Keep up your current routine and check back after your next data export.', priority: 'low', source: 'General wellness' });
+  }
+
+  return recs;
+}
+
+// ---------------------------------------------------------------------------
+// Components
+// ---------------------------------------------------------------------------
+
+const MetricCard: React.FC<{ summary: MetricSummary; icon: React.ReactNode; color: string }> = ({ summary, icon, color }) => (
+  <div className="Card Metric-Card">
+    <div className="Metric-Header">
+      <div className="Metric-Icon" style={{ color }}>{icon}</div>
+      <div>
+        <h4>{summary.label}</h4>
+        <span className="Metric-Count">{summary.readings} readings</span>
+      </div>
+    </div>
+    <div className="Metric-Value" style={{ color }}>
+      {summary.avg} <span className="Metric-Unit">{summary.unit}</span>
+    </div>
+    <div className="Metric-Range">
+      <span>Min: {summary.min}</span>
+      <span>Max: {summary.max}</span>
+    </div>
+    <div className={`Metric-Trend trend-${summary.trend}`}>
+      {summary.trend === 'up' ? <TrendingUp size={14} /> : summary.trend === 'down' ? <TrendingDown size={14} /> : <ArrowRight size={14} />}
+      <span>{summary.trend === 'stable' ? 'Stable' : `${summary.trendPct > 0 ? '+' : ''}${summary.trendPct}%`}</span>
+    </div>
+    {summary.anomalies > 0 && (
+      <div className="Metric-Anomaly-Badge">
+        <AlertTriangle size={12} /> {summary.anomalies} anomal{summary.anomalies === 1 ? 'y' : 'ies'}
+      </div>
+    )}
+  </div>
+);
+
+const MiniChart: React.FC<{ data: { date: string; value: number }[]; color: string; label: string }> = ({ data, color, label }) => (
+  <div className="Card Chart-Card-Mini">
+    <h4>{label}</h4>
+    <div style={{ width: '100%', height: 160 }}>
+      <ResponsiveContainer>
+        <AreaChart data={data}>
+          <defs>
+            <linearGradient id={`grad-${label}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={color} stopOpacity={0.3} />
+              <stop offset="95%" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#30363d" />
+          <XAxis dataKey="date" hide />
+          <YAxis stroke="#8b949e" fontSize={10} width={40} />
+          <Tooltip contentStyle={{ backgroundColor: '#161b22', border: '1px solid #30363d', borderRadius: '8px', fontSize: '12px' }} />
+          <Area type="monotone" dataKey="value" stroke={color} fillOpacity={1} fill={`url(#grad-${label})`} isAnimationActive={false} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  </div>
+);
+
+// ---------------------------------------------------------------------------
+// App
+// ---------------------------------------------------------------------------
 
 function App() {
-  const [currentView, setCurrentView] = useState<AppView>('dashboard');
-  const [patientName, setPatientName] = useState('Patient Alpha');
-  const [patientId, setPatientId] = useState('PT-2026-ALPHA');
-  const [bioState, setBioState] = useState({ glucose: 100, source: 'Ready' });
-  const [chartData, setChartData] = useState<{time: string, value: number}[]>([]);
-  const [resilience, setResilience] = useState(94.2);
-  const [simResults, setSimResults] = useState<any[]>([]);
-  const [brief, setBrief] = useState<any>(null);
-  const [auditTrail, setAuditTrail] = useState<string[]>([]);
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([
-    { type: 'Status', priority: 'Low', action: 'Firewall Active', evidence: 'Topology-based privacy: ON | Zero PHI transmitted' }
-  ]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [selectedDrug, setSelectedDrug] = useState('Atorvastatin');
-  const [dosage, setDosage] = useState(20);
-  const [demoMode, setDemoMode] = useState(false);
-  const [uploadedData, setUploadedData] = useState<BiometricReading[]>([]);
-  const socketRef = useRef<Socket | null>(null);
+  const [readings, setReadings] = useState<BiometricReading[]>([]);
+  const [hasData, setHasData] = useState(false);
 
-  const handleCsvLoaded = (readings: BiometricReading[]) => {
-    setUploadedData(readings);
-    // Feed readings into the chart
-    const glucoseReadings = readings.filter(r => r.type === 'BLOOD_GLUCOSE');
-    const hrvReadings = readings.filter(r => r.type === 'HRV_RMSSD');
-    const chartSource = glucoseReadings.length > 0 ? glucoseReadings : hrvReadings;
-    if (chartSource.length > 0) {
-      setChartData(chartSource.slice(-20).map(r => ({
-        time: new Date(r.timestamp).toLocaleTimeString(),
-        value: r.value,
-      })));
-      setBioState(prev => ({
-        ...prev,
-        glucose: chartSource[chartSource.length - 1].value,
-        source: `CSV Import (${readings.length} readings)`,
-      }));
-    }
+  const handleData = (data: BiometricReading[]) => {
+    setReadings(data);
+    setHasData(data.length > 0);
   };
 
-  useEffect(() => {
-    try {
-      socketRef.current = io(WS_URL, { timeout: 3000, reconnectionAttempts: 2 });
-      socketRef.current.on('telemetry:update', (data: any) => {
-        setBioState(prev => ({ ...prev, glucose: data.value, source: 'Telemetry Active' }));
-        setChartData(prev => [...prev, { time: new Date().toLocaleTimeString(), value: data.value }].slice(-20));
-      });
-      socketRef.current.on('connect_error', () => { setDemoMode(true); });
-    } catch { setDemoMode(true); }
-    return () => { socketRef.current?.disconnect(); };
-  }, []);
-
-  const triggerRehearsal = async () => {
-    setIsLoading(true);
-    setSimResults([]);
-    setBrief(null);
-    setAuditTrail([]);
-    try {
-      const response = await axios.post(`${API_BASE_URL}/v1/simulation/rehearse`, {
-        patient_id: patientId,
-        intervention: { substance: selectedDrug, dose: `${dosage}mg` },
-      }, { timeout: 10000 });
-
-      setSimResults(response.data.report);
-      setBrief(response.data.brief);
-      setAuditTrail(response.data.audit_trail);
-      setResilience(Number((response.data.resilience * 100).toFixed(1)));
-      setRecommendations(response.data.recommendations);
-      setBioState(prev => ({ ...prev, source: 'ADE Signal Detected' }));
-      setDemoMode(false);
-    } catch (err) {
-      // Backend unreachable — use demo data so the UI always works
-      console.warn("Backend unreachable, using demo data:", err);
-      setDemoMode(true);
-      setSimResults(DEMO_REPORT);
-      setBrief(DEMO_BRIEF);
-      setAuditTrail(DEMO_AUDIT);
-      setResilience(89.0);
-      setRecommendations(DEMO_RECOMMENDATIONS);
-      setBioState(prev => ({ ...prev, source: 'Demo Mode — ADE Signal Detected' }));
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const sleep = hasData ? summarize(readings, 'SLEEP_ANALYSIS', 'Sleep Duration', 'min', SLEEP_NORMAL.low, SLEEP_NORMAL.high) : null;
+  const hrv = hasData ? summarize(readings, 'HRV_RMSSD', 'HRV (RMSSD)', 'ms', HRV_NORMAL.low, HRV_NORMAL.high) : null;
+  const steps = hasData ? summarize(readings, 'STEP_COUNT', 'Daily Steps', 'steps', STEPS_NORMAL.low, STEPS_NORMAL.high) : null;
+  const hr = hasData ? summarize(readings, 'RESTING_HEART_RATE', 'Resting Heart Rate', 'bpm', HR_NORMAL.low, HR_NORMAL.high) : null;
+  const anomalies = hasData ? detectAnomalies(readings) : [];
+  const summaries = [sleep, hrv, steps, hr];
+  const recs = hasData ? generateRecommendations(summaries, anomalies) : [];
 
   return (
     <div className="App premium-theme">
@@ -171,161 +269,107 @@ function App() {
           <span>BioGuardian</span>
         </div>
         <div className="Nav-Items">
-          <div className={`Nav-Item ${currentView === 'dashboard' ? 'active' : ''}`} onClick={() => setCurrentView('dashboard')}><Activity size={20} /> Dashboard</div>
-          <div className={`Nav-Item ${currentView === 'history' ? 'active' : ''}`} onClick={() => setCurrentView('history')}><HistoryIcon size={20} /> History</div>
-          <div className={`Nav-Item ${currentView === 'scenarios' ? 'active' : ''}`} onClick={() => setCurrentView('scenarios')}><Zap size={20} /> Protocols</div>
-          <div className={`Nav-Item ${currentView === 'settings' ? 'active' : ''}`} onClick={() => setCurrentView('settings')}><SettingsIcon size={20} /> System</div>
+          <div className="Nav-Item active"><BarChart3 size={20} /> Dashboard</div>
         </div>
         <div className="Privacy-Indicator">
           <Lock size={14} />
-          <span>{demoMode ? 'DEMO MODE' : 'LOCAL_ONLY'}</span>
+          <span>LOCAL ONLY</span>
         </div>
       </nav>
 
       <main className="Main-Content">
         <header className="Top-Bar">
           <div className="Header-Left">
-            <h1>Autonomous Biological Firewall</h1>
-            <span className="Patient-Badge">{patientName} ({patientId}) | {bioState.source}{demoMode ? ' [Demo]' : ''}</span>
-          </div>
-          <div className="Header-Right">
-            {currentView === 'dashboard' && (
-              <button className={`Rehearse-Btn ${isLoading ? 'loading' : ''}`} onClick={triggerRehearsal} disabled={isLoading}>
-                {isLoading ? 'The Swarm is Reasoning...' : <><Play size={16} fill="currentColor"/> Execute Swarm</>}
-              </button>
-            )}
+            <h1>BioGuardian</h1>
+            <span className="Patient-Badge">
+              {hasData ? `${readings.length} readings loaded | ${new Set(readings.map(r => r.type)).size} biometric types` : 'Import your health data to begin'}
+            </span>
           </div>
         </header>
 
-        {currentView === 'dashboard' && (
-          <section className="Dashboard-Grid">
-            <div className="Card Visualizer-Card">
-              <div className="Card-Header">
-                <div className="Title-Group">
-                  <Cpu size={18} />
-                  <h3>Neural Soma Visualizer</h3>
-                </div>
-                <span className="Live-Tag">{demoMode ? 'DEMO' : 'SYNCED'}</span>
-              </div>
-              <div className="Visualizer-Container">
-                <Canvas camera={{ position: [0, 0, 4], fov: 45 }}>
-                  <TwinModel glucose={bioState.glucose} resilience={resilience} />
-                  <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
-                  <OrbitControls enableZoom={false} />
-                  <ContactShadows position={[0, -1.5, 0]} opacity={0.4} scale={10} blur={2.5} far={4} />
-                  <Environment preset="night" />
-                </Canvas>
-              </div>
-            </div>
+        <section className="Simple-Dashboard">
+          <CsvUpload onDataLoaded={handleData} />
 
-            <div className="Stats-Column">
-              <div className="Card Stat-Card highlight-blue">
-                <div className="Stat-Icon"><Activity size={24} /></div>
-                <div className="Stat-Info">
-                  <label>Current Glucose</label>
-                  <div className="Value-Group">
-                    <span className="Value">{bioState.glucose.toFixed(1)}</span>
-                    <span className="Unit">mg/dL</span>
+          {hasData && (
+            <>
+              {/* Metric cards */}
+              <div className="Metrics-Row">
+                {sleep && <MetricCard summary={sleep} icon={<Moon size={24} />} color="#a78bfa" />}
+                {hrv && <MetricCard summary={hrv} icon={<Heart size={24} />} color="#f472b6" />}
+                {steps && <MetricCard summary={steps} icon={<Footprints size={24} />} color="#34d399" />}
+                {hr && <MetricCard summary={hr} icon={<Heart size={24} />} color="#fb923c" />}
+              </div>
+
+              {/* Charts */}
+              <div className="Charts-Row">
+                {sleep && sleep.data.length > 1 && <MiniChart data={sleep.data} color="#a78bfa" label="Sleep Duration (min)" />}
+                {hrv && hrv.data.length > 1 && <MiniChart data={hrv.data} color="#f472b6" label="HRV RMSSD (ms)" />}
+                {steps && steps.data.length > 1 && <MiniChart data={steps.data} color="#34d399" label="Daily Steps" />}
+                {hr && hr.data.length > 1 && <MiniChart data={hr.data} color="#fb923c" label="Resting HR (bpm)" />}
+              </div>
+
+              {/* Anomalies */}
+              {anomalies.length > 0 && (
+                <div className="Card Anomalies-Card">
+                  <div className="Card-Header">
+                    <AlertTriangle size={18} />
+                    <h3>Anomalies Detected ({anomalies.length})</h3>
+                  </div>
+                  <div className="Anomaly-List">
+                    {anomalies.map((a, i) => (
+                      <div key={i} className={`Anomaly-Item severity-${a.severity}`}>
+                        <div className="Anomaly-Header">
+                          <span className={`Severity-Dot ${a.severity}`} />
+                          <strong>{a.message}</strong>
+                        </div>
+                        <div className="Anomaly-Detail">
+                          <span>{a.date}</span>
+                          <span>Value: {Math.round(a.value)}</span>
+                          <span>Expected: {a.expected}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
+              )}
 
-              <div className="Card Stat-Card highlight-green">
-                <div className="Stat-Icon"><ShieldCheck size={24} /></div>
-                <div className="Stat-Info">
-                  <label>Biological Integrity</label>
-                  <div className="Value-Group">
-                    <span className="Value">{resilience}%</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="Card Controls-Card">
+              {/* Recommendations */}
+              <div className="Card Recs-Card">
                 <div className="Card-Header">
-                  <h3>Protocol Event Input</h3>
+                  <Stethoscope size={18} />
+                  <h3>Recommendations ({recs.length})</h3>
                 </div>
-                <div className="Control-Groups">
-                  <div className="Group">
-                    <label>Patient ID</label>
-                    <input type="text" value={patientId} onChange={(e) => { setPatientId(e.target.value); setPatientName(e.target.value); }} />
-                  </div>
-                  <div className="Group">
-                    <label>Substance</label>
-                    <select value={selectedDrug} onChange={(e) => setSelectedDrug(e.target.value)}>
-                      <option value="Atorvastatin">Atorvastatin (Statin)</option>
-                      <option value="Simvastatin">Simvastatin (Statin)</option>
-                      <option value="Rosuvastatin">Rosuvastatin (Statin)</option>
-                      <option value="Metformin">Metformin (Biguanide)</option>
-                      <option value="Lisinopril">Lisinopril (ACE Inhibitor)</option>
-                      <option value="Magnesium">Magnesium (Supplement)</option>
-                    </select>
-                  </div>
-                  <div className="Group">
-                    <label>Dose (mg)</label>
-                    <input type="number" value={dosage} onChange={(e) => setDosage(Number(e.target.value))} />
-                  </div>
+                <div className="Recs-List">
+                  {recs.map((rec, i) => (
+                    <div key={i} className={`Rec-Card priority-${rec.priority}`}>
+                      <div className="Rec-Icon">
+                        {rec.category === 'supplement' ? <Pill size={20} /> : rec.category === 'doctor' ? <Stethoscope size={20} /> : <Footprints size={20} />}
+                      </div>
+                      <div className="Rec-Content">
+                        <div className="Rec-Title">
+                          <strong>{rec.title}</strong>
+                          <span className={`Priority-Tag ${rec.priority}`}>{rec.priority.toUpperCase()}</span>
+                          <span className="Category-Tag">{rec.category}</span>
+                        </div>
+                        <p>{rec.detail}</p>
+                        <span className="Rec-Source">{rec.source}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
+            </>
+          )}
+
+          {!hasData && (
+            <div className="Empty-Dashboard Card">
+              <Moon size={48} className="Empty-Icon" />
+              <h3>Import Your Health Data</h3>
+              <p>Drop a CSV export from Apple Health, Garmin Connect, or any tracker above. BioGuardian will analyze your sleep and activity patterns, detect anomalies, and generate personalised recommendations.</p>
+              <p className="Empty-Hint">All analysis runs locally in your browser. No data is transmitted anywhere.</p>
             </div>
-
-            <div className="Card Chart-Card">
-              <div className="Card-Header">
-                <h3>Biometric Drift (Pearson r Analysis)</h3>
-              </div>
-              <MetabolicChart data={chartData} />
-            </div>
-
-            <CsvUpload onDataLoaded={handleCsvLoaded} />
-
-            <div className="Card Recommendations-Card">
-              <div className="Card-Header">
-                <h3>Firewall Status</h3>
-              </div>
-              <div className="Rec-List">
-                {recommendations.map((rec, i) => (
-                  <div key={i} className={`Rec-Item ${rec.type.toLowerCase()}`}>
-                    <div className="Rec-Meta">{rec.type} | {rec.priority.toUpperCase()}</div>
-                    <div className="Rec-Body">{rec.action}</div>
-                    <div className="Rec-Footer">{rec.evidence}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="Card Console-Card">
-              <div className="Card-Header">
-                <h3>Agent Swarm Reasoning Trace</h3>
-              </div>
-              <div className="Console-Output">
-                {simResults.length > 0 ? simResults.map((result: any, i: number) => (
-                  <div key={i} className="Console-Log">
-                    <span className="Agent-Name">[{result.agent}]</span>
-                    <span className="Agent-Message">{result.message}</span>
-                    {result.confidence && <span className="Agent-Confidence"> ({(result.confidence * 100).toFixed(0)}%)</span>}
-                  </div>
-                )) : (
-                  <div className="Empty-State">Standby. Press "Execute Swarm" to run the pipeline.</div>
-                )}
-              </div>
-            </div>
-
-            {brief && (
-              <div style={{ gridColumn: 'span 2' }}>
-                <PhysicianBriefView brief={brief} />
-              </div>
-            )}
-
-            {auditTrail.length > 0 && (
-              <div style={{ gridColumn: 'span 1' }}>
-                <AuditTrailView hashes={auditTrail} />
-              </div>
-            )}
-          </section>
-        )}
-
-        {currentView === 'history' && <HistoryView patientId={patientId} apiBaseUrl={API_BASE_URL} demoMode={demoMode} />}
-        {currentView === 'scenarios' && <ScenarioView />}
-        {currentView === 'settings' && <SettingsView apiBaseUrl={API_BASE_URL} wsUrl={WS_URL} demoMode={demoMode} />}
+          )}
+        </section>
       </main>
     </div>
   );

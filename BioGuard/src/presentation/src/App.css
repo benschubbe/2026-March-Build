@@ -1106,6 +1106,156 @@ body {
 .accent-green { color: #3fb950; }
 .danger-text { color: #f85149; }
 
+/* === SIMPLIFIED DASHBOARD === */
+
+.Simple-Dashboard {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.Metrics-Row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.Metric-Card {
+  padding: 20px;
+}
+.Metric-Header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.Metric-Header h4 { margin: 0; font-size: 14px; color: var(--text-primary); }
+.Metric-Count { font-size: 11px; color: var(--text-secondary); }
+.Metric-Icon { flex-shrink: 0; }
+.Metric-Value {
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+.Metric-Unit { font-size: 14px; font-weight: 400; opacity: 0.7; }
+.Metric-Range {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+.Metric-Trend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.trend-up { color: var(--success); }
+.trend-down { color: var(--danger); }
+.trend-stable { color: var(--text-secondary); }
+.Metric-Anomaly-Badge {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--warning);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.Charts-Row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+.Chart-Card-Mini {
+  padding: 16px;
+}
+.Chart-Card-Mini h4 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* Anomalies */
+.Anomalies-Card { padding: 20px; }
+.Anomalies-Card .Card-Header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: var(--warning); }
+.Anomaly-List { display: flex; flex-direction: column; gap: 8px; }
+.Anomaly-Item {
+  padding: 10px 12px;
+  border-radius: 6px;
+  border-left: 3px solid;
+}
+.severity-low { border-color: var(--text-secondary); background: rgba(139,148,158,0.05); }
+.severity-medium { border-color: var(--warning); background: rgba(241,224,90,0.05); }
+.severity-high { border-color: var(--danger); background: rgba(248,81,73,0.05); }
+.Anomaly-Header { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.Severity-Dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.Severity-Dot.low { background: var(--text-secondary); }
+.Severity-Dot.medium { background: var(--warning); }
+.Severity-Dot.high { background: var(--danger); }
+.Anomaly-Detail {
+  display: flex; gap: 16px; font-size: 11px; color: var(--text-secondary); margin-top: 4px; padding-left: 16px;
+}
+
+/* Recommendations */
+.Recs-Card { padding: 20px; }
+.Recs-Card .Card-Header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+.Recs-List { display: flex; flex-direction: column; gap: 12px; }
+.Rec-Card {
+  display: flex;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: rgba(22,27,34,0.6);
+}
+.priority-high { border-left: 3px solid var(--danger); }
+.priority-medium { border-left: 3px solid var(--warning); }
+.priority-low { border-left: 3px solid var(--text-secondary); }
+.Rec-Icon {
+  flex-shrink: 0;
+  color: var(--accent-color);
+  padding-top: 2px;
+}
+.Rec-Content { flex: 1; }
+.Rec-Title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.Rec-Title strong { font-size: 14px; color: var(--text-primary); }
+.Priority-Tag {
+  font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 3px;
+}
+.Priority-Tag.high { background: rgba(248,81,73,0.15); color: var(--danger); }
+.Priority-Tag.medium { background: rgba(241,224,90,0.15); color: var(--warning); }
+.Priority-Tag.low { background: rgba(139,148,158,0.1); color: var(--text-secondary); }
+.Category-Tag {
+  font-size: 10px; padding: 1px 6px; border-radius: 3px;
+  background: rgba(88,166,255,0.1); color: var(--accent-color);
+}
+.Rec-Content p { font-size: 13px; color: var(--text-secondary); margin: 0 0 4px 0; line-height: 1.5; }
+.Rec-Source { font-size: 10px; color: var(--text-secondary); opacity: 0.6; font-style: italic; }
+
+/* Empty state */
+.Empty-Dashboard {
+  text-align: center;
+  padding: 60px 40px;
+}
+.Empty-Icon { color: var(--text-secondary); opacity: 0.3; margin-bottom: 16px; }
+.Empty-Dashboard h3 { color: var(--text-primary); margin-bottom: 8px; }
+.Empty-Dashboard p { color: var(--text-secondary); font-size: 14px; max-width: 500px; margin: 0 auto 8px; }
+.Empty-Hint { font-size: 12px !important; opacity: 0.6; }
+
 /* --- CSV Upload --- */
 .CsvUpload-Card { grid-column: span 2; }
 .CsvUpload-Card .Card-Header { display: flex; justify-content: space-between; align-items: center; }
