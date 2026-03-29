@@ -1,36 +1,20 @@
 """
-BioGuardian Privacy Engine
-===========================
+BioGuardian Privacy Engine — Interface Stub (Layer 2)
+======================================================
 
-On-device privacy enforcement layer implementing the "privacy by topology"
-design from master plan §4:
+This module defines the **interface contract** for BioGuardian's
+Homomorphic Encryption and Federated Learning capabilities, planned
+for Layer 2 (post-hackathon, months 3-9).
 
-  "The threat is not a sophisticated attacker.  It is the structural
-   liability of centralized health data storage: regulatory exposure,
-   breach surface, and the commercial incentive that eventually monetizes
-   what it holds.  BioGuardian eliminates this liability topologically —
-   no central repository exists to attack, subpoena, or sell."
+**Current hackathon privacy is enforced topologically, not cryptographically:**
+  - Zero raw PHI leaves the device (all targets localhost)
+  - No central repository exists to attack, subpoena, or sell
+  - SHA-256 audit chain logs all agent actions locally
+  - MCP server runs in sandboxed on-device process
 
-This module provides:
-
-  **Homomorphic Encryption (HE) simulation**
-    Production-grade mock implementing CKKS-style operations with noise
-    tracking.  Ready for drop-in replacement with Microsoft SEAL or
-    OpenFHE at Layer 2.
-
-  **Federated Learning (FL) secure aggregation**
-    Simulates encrypted gradient contribution architecture where opt-in
-    users contribute anonymized gradient updates without exposing
-    individual data.
-
-All operations preserve the invariant: **no PHI unencrypted outside the
-local trust boundary**.
-
-Note: This is a structurally accurate mock.  Real HE operations would use
-Microsoft SEAL (BFV/CKKS schemes) or OpenFHE.  The mock preserves the
-correct API surface and noise growth characteristics so that the
-integration contract is validated before production cryptographic
-libraries are linked.
+This stub validates the API surface and noise growth characteristics
+so that Microsoft SEAL or OpenFHE can be linked at Layer 2 without
+changing any calling code.  It is NOT used in the hackathon demo pipeline.
 """
 
 from __future__ import annotations

@@ -1,61 +1,64 @@
-# BioGuardian: Project Roadmap & Agile Backlog
+# BioGuardian: Execution Roadmap
 
-## 1. Agile Methodology: "The Swarm"
-BioGuardian utilizes a specialized **Agentic Agile** framework. Instead of traditional siloed development, we operate in functional "swarms" that mirror our multi-agent architecture.
+## Hackathon Build (24 Hours)
 
-*   **Sprint Cadence:** 2-week iterations.
-*   **Daily Sync:** 15-minute "State Update" focused on agent-to-agent interface stability.
-*   **Definition of Done:** Automated biological validation tests passed, code reviewed by a peer "agent" (senior dev), and 100% test coverage on edge cases.
+### Milestone Schedule
 
----
+| Hours | Phase | Deliverables |
+|-------|-------|-------------|
+| 0-2 | Schema Lock | Pydantic schemas merged, LLM latency confirmed, scope signed, fallbacks committed |
+| 2-10 | Parallel Build | Scribe + Pharmacist (AI Lead), Correlation Engine (Data Scientist), Auditor YAML (Reg. Lead), React shell (Full-Stack) |
+| 10-18 | Integration | LangGraph wires all 4 agents, Compliance Auditor gates every output, React connects to live agents |
+| 18-22 | Hardening | Happy path 5x, fallbacks verified, demo device locked, intentional block rehearsed |
+| 22-24 | Pitch | 3-min presentation rehearsed, fallback video recorded, closing sentence memorized |
 
-## 2. Strategic Roadmap (Phases)
+### Scope Contract (Signed Before Build)
 
-### Phase 1: The Sensorium (Months 1-3)
-*   **Goal:** Establish high-fidelity data ingestion and the core metabolic twin.
-*   **Key Milestone:** Real-time CGM streaming and predictive post-prandial glucose modeling.
+**IN SCOPE:**
+- The Scribe: PDF -> LOINC-normalised JSON (OCR + RAG)
+- The Pharmacist: drug names + lab JSON -> openFDA contraindication flags
+- The Correlation Engine: HealthKit CSV -> AnomalySignal with Pearson r, p-value, CI
+- The Compliance Auditor: 47 deterministic predicate rules (YAML config)
+- LangGraph orchestration: stateful directed graph, 4 agents
+- MCP server: typed tool schemas, sandboxed on-device
+- React dashboard: upload, drug input, status feed, Physician Brief output
+- gRPC telemetry gateway: FHIR R4 normalization, audit chain
+- Physician Brief PDF: SOAP-formatted with audit hash footer
+- SHA-256 audit chain: local, on-device, cryptographically verifiable
 
-### Phase 2: The Cerebellum (Months 4-6)
-*   **Goal:** Deploy LangGraph orchestration and the full Multi-Agent Swarm.
-*   **Key Milestone:** Omics + Lifestyle agents negotiating medication scenarios in under 15 seconds.
-
-### Phase 3: The Bio-Guardian (Months 7-12)
-*   **Goal:** Clinical integration and autonomous execution.
-*   **Key Milestone:** Pre-surgical rehearsal module and automated insurance prior-authorization engine.
-
----
-
-## 3. Epics & Backlog
-
-### [EPIC-001] Ingestion: High-Throughput Biological Telemetry
-*   **Focus:** Go/gRPC services for wearable and EHR data.
-*   **Sprint 1 Tasks:** gRPC Sink, FHIR Normalizer.
-
-### [EPIC-002] Orchestration: Multi-Agent "Cerebellum"
-*   **Focus:** LangGraph, state management, and LLM-agent logic.
-*   **Sprint 1 Tasks:** LangGraph Scaffold, Agent Stubbing.
-
-### [EPIC-003] Simulation: GPU-Accelerated Modeling
-*   **Focus:** NVIDIA Holoscan, CUDA, and chemical kinetics.
-*   **Sprint 1 Tasks:** Holoscan SDK Setup, Baseline CUDA Operator.
-
-### [EPIC-004] Interface: High-Fidelity 3D Simulation
-*   **Focus:** React, WebGL, and Vulkan for bio-visualization.
-*   **Sprint 1 Tasks:** WebGL Dashboard, Real-time Graphing.
-
-### [EPIC-005] Privacy: Secure Computation & Federated Learning
-*   **Focus:** Homomorphic Encryption (HE) and local model training.
-*   **Sprint 1 Tasks:** HE Wrapper, Federated Scaffolding.
+**OUT OF SCOPE (roadmap only):**
+- Family Risk Guard
+- Cloud sync / encrypted cloud backup
+- Telehealth pre-booking integration
+- FHIR R4 direct-pull (Epic/Cerner)
+- Android / HealthConnect
+- Agent plugin marketplace
+- Multi-user accounts
 
 ---
 
-## 4. Sprint Schedule (First Quarter)
+## Post-Hackathon Scalability (Three Layers)
 
-| Sprint | Focus | Primary Deliverable |
-| :--- | :--- | :--- |
-| **Sprint 1** | Foundations | LangGraph Scaffold + gRPC Ingestion |
-| **Sprint 2** | Connectivity | Real-time CGM Stream to Metabolic Twin |
-| **Sprint 3** | Acceleration | First Holoscan-accelerated Metabolic Sim |
-| **Sprint 4** | Negotiation | Omics + Metabolic Agent Interaction |
-| **Sprint 5** | Security | Encrypted EHR Simulation |
-| **Sprint 6** | Visualization | First 3D Interactive Simulation Demo |
+### Layer 2 — Post-MVP (Months 3-9)
+- Encrypted cloud sync (AES-256 client-side, server stores ciphertext only)
+- Agent plugin marketplace via MCP interface contracts
+- Android + HealthConnect using BiometricStream schema
+- FHIR R4 direct-pull: Scribe accuracy 94% -> 99.8%
+- Telehealth pre-booking via Teladoc API
+- Lab panel ordering via Quest Diagnostics API
+
+### Layer 3 — Platform (Year 1+)
+- BioGuardian API: white-label Physician Brief engine
+- Federated learning: opt-in anonymised gradient contributions
+- International expansion (EMA, Health Canada)
+- CGM integration (Dexcom, Abbott Libre)
+- 23andMe/Ancestry SNP data via Genomics Agent MCP plugin
+
+---
+
+## Commit Strategy
+
+- Commits every 30-60 minutes per engineer during build
+- Scope-prefixed messages: `[scribe]`, `[pharmacist]`, `[correlation]`, `[auditor]`, `[mobile]`, `[integration]`
+- Co-author attribution on AI-assisted commits
+- Fallback assets committed at Hour 0 before build clock starts

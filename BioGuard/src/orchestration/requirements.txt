@@ -4,3 +4,5 @@ pydantic
 flask
 flask-cors
 requests
+numpy
+pyyaml
