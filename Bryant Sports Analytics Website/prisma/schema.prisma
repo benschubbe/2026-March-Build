@@ -1,0 +1,482 @@
+// Bryant Sports Analytics Hub — Prisma Schema
+// Platform for university sports analytics students
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Role {
+  STUDENT
+  FACULTY
+  ALUMNI
+  RECRUITER
+  ADMIN
+}
+
+enum Visibility {
+  PUBLIC
+  BRYANT_ONLY
+  PRIVATE
+}
+
+enum ReactionType {
+  UPVOTE
+  INSIGHTFUL
+  FIRE
+  CLAP
+}
+
+enum ChannelType {
+  SPORT
+  CLASS
+  CLUB
+  GENERAL
+}
+
+enum RoleType {
+  ANALYST
+  DATA_ENGINEER
+  DATA_SCIENTIST
+  SCOUT
+  RESEARCHER
+  STRATEGIST
+  OTHER
+}
+
+enum ExperienceLevel {
+  INTERN
+  ENTRY
+  MID
+}
+
+enum ApplicationStatus {
+  INTERESTED
+  APPLIED
+  PHONE_SCREEN
+  INTERVIEW
+  OFFER
+  ACCEPTED
+  REJECTED
+}
+
+enum EventType {
+  SPEAKER
+  MIXER
+  CAREER_FAIR
+  WORKSHOP
+  WATCH_PARTY
+  MEETING
+}
+
+enum MentorMatchStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+}
+
+enum MentorCadence {
+  MONTHLY
+  AD_HOC
+  ASYNC
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String?  @map("password_hash")
+  image        String?
+  bio          String?
+  classYear    String?  @map("class_year")
+  concentration String?
+  headline     String?
+  linkedinUrl  String?  @map("linkedin_url")
+  githubUrl    String?  @map("github_url")
+  personalUrl  String?  @map("personal_url")
+  role         Role     @default(STUDENT)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  projects              Project[]
+  posts                 Post[]
+  comments              Comment[]
+  reviewsGiven          Review[]              @relation("ReviewerRelation")
+  reviewsReceived       Review[]              @relation("ReviewAuthorRelation")
+  reactions             Reaction[]
+  messagesSent          Message[]             @relation("MessageSender")
+  messagesReceived      Message[]             @relation("MessageReceiver")
+  applications          Application[]
+  certifications        Certification[]
+  challengeSubmissions  ChallengeSubmission[]
+  eventRsvps            EventRsvp[]
+  mentorOf              MentorMatch[]         @relation("MentorRelation")
+  menteeOf              MentorMatch[]         @relation("MenteeRelation")
+  tutorials             Tutorial[]
+
+  @@map("users")
+}
+
+model Project {
+  id            String      @id @default(cuid())
+  title         String
+  slug          String      @unique
+  abstract      String?
+  content       String?
+  methodology   String?
+  sport         String[]
+  technique     String[]
+  tools         String[]
+  domain        String[]
+  visibility    Visibility  @default(PUBLIC)
+  mediaUrls     String[]    @map("media_urls")
+  githubUrl     String?     @map("github_url")
+  tableauUrl    String?     @map("tableau_url")
+  videoUrl      String?     @map("video_url")
+  views         Int         @default(0)
+  openForReview Boolean     @default(false) @map("open_for_review")
+  publishedAt   DateTime?   @map("published_at")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  authorId String  @map("author_id")
+  author   User    @relation(fields: [authorId], references: [id])
+  comments Comment[]
+  reviews  Review[]
+  tags     Tag[]
+
+  challengeSubmissions ChallengeSubmission[]
+
+  @@index([slug])
+  @@index([authorId])
+  @@map("projects")
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  content   String
+  mediaUrls String[] @map("media_urls")
+  pinned    Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  authorId  String    @map("author_id")
+  author    User      @relation(fields: [authorId], references: [id])
+  channelId String?   @map("channel_id")
+  channel   Channel?  @relation(fields: [channelId], references: [id])
+  comments  Comment[]
+  reactions Reaction[]
+
+  @@index([authorId])
+  @@index([channelId])
+  @@map("posts")
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  authorId  String   @map("author_id")
+  author    User     @relation(fields: [authorId], references: [id])
+  projectId String?  @map("project_id")
+  project   Project? @relation(fields: [projectId], references: [id])
+  postId    String?  @map("post_id")
+  post      Post?    @relation(fields: [postId], references: [id])
+  parentId  String?  @map("parent_id")
+  parent    Comment? @relation("CommentThread", fields: [parentId], references: [id])
+  replies   Comment[] @relation("CommentThread")
+  reactions Reaction[]
+
+  @@index([authorId])
+  @@index([projectId])
+  @@index([postId])
+  @@index([parentId])
+  @@map("comments")
+}
+
+model Reaction {
+  id        String       @id @default(cuid())
+  type      ReactionType
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  // Relations
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id])
+  postId    String?  @map("post_id")
+  post      Post?    @relation(fields: [postId], references: [id])
+  commentId String?  @map("comment_id")
+  comment   Comment? @relation(fields: [commentId], references: [id])
+
+  @@unique([userId, postId])
+  @@unique([userId, commentId])
+  @@index([userId])
+  @@map("reactions")
+}
+
+model Channel {
+  id          String      @id @default(cuid())
+  name        String      @unique
+  description String?
+  sport       String?
+  type        ChannelType @default(GENERAL)
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  // Relations
+  posts Post[]
+
+  @@index([name])
+  @@map("channels")
+}
+
+model Review {
+  id                 String   @id @default(cuid())
+  methodologyScore   Int      @map("methodology_score")
+  visualizationScore Int      @map("visualization_score")
+  writingScore       Int      @map("writing_score")
+  codeQualityScore   Int      @map("code_quality_score")
+  rigorScore         Int      @map("rigor_score")
+  feedback           String
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  // Relations
+  reviewerId String  @map("reviewer_id")
+  reviewer   User    @relation("ReviewerRelation", fields: [reviewerId], references: [id])
+  projectId  String  @map("project_id")
+  project    Project @relation(fields: [projectId], references: [id])
+  authorId   String  @map("author_id")
+  author     User    @relation("ReviewAuthorRelation", fields: [authorId], references: [id])
+
+  @@index([reviewerId])
+  @@index([projectId])
+  @@index([authorId])
+  @@map("reviews")
+}
+
+model Job {
+  id               String          @id @default(cuid())
+  title            String
+  company          String
+  description      String
+  sport            String?
+  roleType         RoleType        @map("role_type")
+  location         String?
+  experienceLevel  ExperienceLevel @map("experience_level")
+  remote           Boolean         @default(false)
+  url              String?
+  postedById       String?         @map("posted_by_id")
+  bryantConnection Boolean         @default(false) @map("bryant_connection")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  expiresAt        DateTime?       @map("expires_at")
+
+  // Relations
+  applications Application[]
+
+  @@index([roleType])
+  @@index([experienceLevel])
+  @@map("jobs")
+}
+
+model Application {
+  id           String            @id @default(cuid())
+  status       ApplicationStatus @default(INTERESTED)
+  notes        String?
+  contactInfo  String?           @map("contact_info")
+  followUpDate DateTime?         @map("follow_up_date")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id])
+  jobId  String @map("job_id")
+  job    Job    @relation(fields: [jobId], references: [id])
+
+  @@index([userId])
+  @@index([jobId])
+  @@map("applications")
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  content   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  senderId   String @map("sender_id")
+  sender     User   @relation("MessageSender", fields: [senderId], references: [id])
+  receiverId String @map("receiver_id")
+  receiver   User   @relation("MessageReceiver", fields: [receiverId], references: [id])
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@map("messages")
+}
+
+model Challenge {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  datasetUrl  String?  @map("dataset_url")
+  sport       String?
+  startDate   DateTime @map("start_date")
+  endDate     DateTime @map("end_date")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  submissions ChallengeSubmission[]
+
+  @@map("challenges")
+}
+
+model ChallengeSubmission {
+  id        String   @id @default(cuid())
+  content   String
+  votes     Int      @default(0)
+  winner    Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  userId      String    @map("user_id")
+  user        User      @relation(fields: [userId], references: [id])
+  challengeId String    @map("challenge_id")
+  challenge   Challenge @relation(fields: [challengeId], references: [id])
+  projectId   String?   @map("project_id")
+  project     Project?  @relation(fields: [projectId], references: [id])
+
+  @@index([userId])
+  @@index([challengeId])
+  @@map("challenge_submissions")
+}
+
+model LearningPath {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  description String?
+  sport       String?
+  steps       Json
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([slug])
+  @@map("learning_paths")
+}
+
+model Tutorial {
+  id        String   @id @default(cuid())
+  title     String
+  slug      String   @unique
+  content   String
+  tool      String?
+  category  String?
+  staffPick Boolean  @default(false) @map("staff_pick")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  authorId String @map("author_id")
+  author   User   @relation(fields: [authorId], references: [id])
+
+  @@index([slug])
+  @@index([authorId])
+  @@map("tutorials")
+}
+
+model Certification {
+  id              String   @id @default(cuid())
+  name            String
+  provider        String
+  completedAt     DateTime @map("completed_at")
+  verificationUrl String?  @map("verification_url")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  // Relations
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("certifications")
+}
+
+model Event {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  type        EventType
+  location    String?
+  startTime   DateTime  @map("start_time")
+  endTime     DateTime  @map("end_time")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  rsvps EventRsvp[]
+
+  @@map("events")
+}
+
+model EventRsvp {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  userId  String @map("user_id")
+  user    User   @relation(fields: [userId], references: [id])
+  eventId String @map("event_id")
+  event   Event  @relation(fields: [eventId], references: [id])
+
+  @@unique([userId, eventId])
+  @@index([userId])
+  @@index([eventId])
+  @@map("event_rsvps")
+}
+
+model MentorMatch {
+  id        String            @id @default(cuid())
+  status    MentorMatchStatus @default(PENDING)
+  cadence   MentorCadence     @default(AD_HOC)
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  mentorId String @map("mentor_id")
+  mentor   User   @relation("MentorRelation", fields: [mentorId], references: [id])
+  menteeId String @map("mentee_id")
+  mentee   User   @relation("MenteeRelation", fields: [menteeId], references: [id])
+
+  @@index([mentorId])
+  @@index([menteeId])
+  @@map("mentor_matches")
+}
+
+model WeeklyDigest {
+  id        String   @id @default(cuid())
+  content   String
+  weekOf    DateTime @map("week_of")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("weekly_digests")
+}
+
+model Tag {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  projects Project[]
+
+  @@map("tags")
+}
