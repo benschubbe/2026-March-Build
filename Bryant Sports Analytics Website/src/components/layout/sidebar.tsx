@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BarChart3,
   FolderOpen,
   Layers,
   Search,
@@ -39,6 +40,7 @@ const navSections: NavSection[] = [
   {
     title: "SHOWCASE",
     items: [
+      { label: "My Analytics", href: "/my-analytics", icon: BarChart3 },
       { label: "Portfolio", href: "/portfolio", icon: FolderOpen },
       { label: "My Projects", href: "/projects", icon: Layers },
       { label: "Gallery", href: "/gallery", icon: Search },
