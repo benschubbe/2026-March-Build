@@ -6,86 +6,21 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
-// ─── Enums ───────────────────────────────────────────────────────────────────
-
-enum Role {
-  STUDENT
-  FACULTY
-  ALUMNI
-  RECRUITER
-  ADMIN
-}
-
-enum Visibility {
-  PUBLIC
-  BRYANT_ONLY
-  PRIVATE
-}
-
-enum ReactionType {
-  UPVOTE
-  INSIGHTFUL
-  FIRE
-  CLAP
-}
-
-enum ChannelType {
-  SPORT
-  CLASS
-  CLUB
-  GENERAL
-}
-
-enum RoleType {
-  ANALYST
-  DATA_ENGINEER
-  DATA_SCIENTIST
-  SCOUT
-  RESEARCHER
-  STRATEGIST
-  OTHER
-}
-
-enum ExperienceLevel {
-  INTERN
-  ENTRY
-  MID
-}
-
-enum ApplicationStatus {
-  INTERESTED
-  APPLIED
-  PHONE_SCREEN
-  INTERVIEW
-  OFFER
-  ACCEPTED
-  REJECTED
-}
-
-enum EventType {
-  SPEAKER
-  MIXER
-  CAREER_FAIR
-  WORKSHOP
-  WATCH_PARTY
-  MEETING
-}
-
-enum MentorMatchStatus {
-  PENDING
-  ACTIVE
-  COMPLETED
-}
-
-enum MentorCadence {
-  MONTHLY
-  AD_HOC
-  ASYNC
-}
+// Note: SQLite does not support enums — use String fields with conventions:
+// Role: STUDENT | FACULTY | ALUMNI | RECRUITER | ADMIN
+// Visibility: PUBLIC | BRYANT_ONLY | PRIVATE
+// ReactionType: UPVOTE | INSIGHTFUL | FIRE | CLAP
+// ChannelType: SPORT | CLASS | CLUB | GENERAL
+// RoleType: ANALYST | DATA_ENGINEER | DATA_SCIENTIST | SCOUT | RESEARCHER | STRATEGIST | OTHER
+// ExperienceLevel: INTERN | ENTRY | MID
+// ApplicationStatus: INTERESTED | APPLIED | PHONE_SCREEN | INTERVIEW | OFFER | ACCEPTED | REJECTED
+// EventType: SPEAKER | MIXER | CAREER_FAIR | WORKSHOP | WATCH_PARTY | MEETING
+// MentorMatchStatus: PENDING | ACTIVE | COMPLETED
+// MentorCadence: MONTHLY | AD_HOC | ASYNC
 
 // ─── Models ──────────────────────────────────────────────────────────────────
 
@@ -102,7 +37,7 @@ model User {
   linkedinUrl  String?  @map("linkedin_url")
   githubUrl    String?  @map("github_url")
   personalUrl  String?  @map("personal_url")
-  role         Role     @default(STUDENT)
+  role         String   @default("STUDENT")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
@@ -127,26 +62,26 @@ model User {
 }
 
 model Project {
-  id            String      @id @default(cuid())
+  id            String   @id @default(cuid())
   title         String
-  slug          String      @unique
+  slug          String   @unique
   abstract      String?
   content       String?
   methodology   String?
-  sport         String[]
-  technique     String[]
-  tools         String[]
-  domain        String[]
-  visibility    Visibility  @default(PUBLIC)
-  mediaUrls     String[]    @map("media_urls")
-  githubUrl     String?     @map("github_url")
-  tableauUrl    String?     @map("tableau_url")
-  videoUrl      String?     @map("video_url")
-  views         Int         @default(0)
-  openForReview Boolean     @default(false) @map("open_for_review")
-  publishedAt   DateTime?   @map("published_at")
-  createdAt     DateTime    @default(now()) @map("created_at")
-  updatedAt     DateTime    @updatedAt @map("updated_at")
+  sport         String   @default("[]")
+  technique     String   @default("[]")
+  tools         String   @default("[]")
+  domain        String   @default("[]")
+  visibility    String   @default("PUBLIC")
+  mediaUrls     String   @default("[]") @map("media_urls")
+  githubUrl     String?  @map("github_url")
+  tableauUrl    String?  @map("tableau_url")
+  videoUrl      String?  @map("video_url")
+  views         Int      @default(0)
+  openForReview Boolean  @default(false) @map("open_for_review")
+  publishedAt   DateTime? @map("published_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   // Relations
   authorId String  @map("author_id")
@@ -165,7 +100,7 @@ model Project {
 model Post {
   id        String   @id @default(cuid())
   content   String
-  mediaUrls String[] @map("media_urls")
+  mediaUrls String   @default("[]") @map("media_urls")
   pinned    Boolean  @default(false)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -209,9 +144,9 @@ model Comment {
 }
 
 model Reaction {
-  id        String       @id @default(cuid())
-  type      ReactionType
-  createdAt DateTime     @default(now()) @map("created_at")
+  id        String   @id @default(cuid())
+  type      String
+  createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
   userId    String   @map("user_id")
@@ -228,12 +163,12 @@ model Reaction {
 }
 
 model Channel {
-  id          String      @id @default(cuid())
-  name        String      @unique
+  id          String   @id @default(cuid())
+  name        String   @unique
   description String?
   sport       String?
-  type        ChannelType @default(GENERAL)
-  createdAt   DateTime    @default(now()) @map("created_at")
+  type        String   @default("GENERAL")
+  createdAt   DateTime @default(now()) @map("created_at")
 
   // Relations
   posts Post[]
@@ -267,20 +202,20 @@ model Review {
 }
 
 model Job {
-  id               String          @id @default(cuid())
+  id               String    @id @default(cuid())
   title            String
   company          String
   description      String
   sport            String?
-  roleType         RoleType        @map("role_type")
+  roleType         String    @map("role_type")
   location         String?
-  experienceLevel  ExperienceLevel @map("experience_level")
-  remote           Boolean         @default(false)
+  experienceLevel  String    @map("experience_level")
+  remote           Boolean   @default(false)
   url              String?
-  postedById       String?         @map("posted_by_id")
-  bryantConnection Boolean         @default(false) @map("bryant_connection")
-  createdAt        DateTime        @default(now()) @map("created_at")
-  expiresAt        DateTime?       @map("expires_at")
+  postedById       String?   @map("posted_by_id")
+  bryantConnection Boolean   @default(false) @map("bryant_connection")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  expiresAt        DateTime? @map("expires_at")
 
   // Relations
   applications Application[]
@@ -291,13 +226,13 @@ model Job {
 }
 
 model Application {
-  id           String            @id @default(cuid())
-  status       ApplicationStatus @default(INTERESTED)
+  id           String    @id @default(cuid())
+  status       String    @default("INTERESTED")
   notes        String?
-  contactInfo  String?           @map("contact_info")
-  followUpDate DateTime?         @map("follow_up_date")
-  createdAt    DateTime          @default(now()) @map("created_at")
-  updatedAt    DateTime          @updatedAt @map("updated_at")
+  contactInfo  String?   @map("contact_info")
+  followUpDate DateTime? @map("follow_up_date")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
   // Relations
   userId String @map("user_id")
@@ -370,7 +305,7 @@ model LearningPath {
   slug        String   @unique
   description String?
   sport       String?
-  steps       Json
+  steps       String   @default("[]")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -415,14 +350,14 @@ model Certification {
 }
 
 model Event {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   title       String
   description String?
-  type        EventType
+  type        String
   location    String?
-  startTime   DateTime  @map("start_time")
-  endTime     DateTime  @map("end_time")
-  createdAt   DateTime  @default(now()) @map("created_at")
+  startTime   DateTime @map("start_time")
+  endTime     DateTime @map("end_time")
+  createdAt   DateTime @default(now()) @map("created_at")
 
   // Relations
   rsvps EventRsvp[]
@@ -447,11 +382,11 @@ model EventRsvp {
 }
 
 model MentorMatch {
-  id        String            @id @default(cuid())
-  status    MentorMatchStatus @default(PENDING)
-  cadence   MentorCadence     @default(AD_HOC)
-  createdAt DateTime          @default(now()) @map("created_at")
-  updatedAt DateTime          @updatedAt @map("updated_at")
+  id        String   @id @default(cuid())
+  status    String   @default("PENDING")
+  cadence   String   @default("AD_HOC")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
   mentorId String @map("mentor_id")
